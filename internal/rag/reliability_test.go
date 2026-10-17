@@ -10,10 +10,10 @@ import (
 	"rag-template/internal/retrieval"
 )
 
-// failingGeneratorErr is the sentinel error the failure-path stub returns. It
+// errFailingGenerator is the sentinel error the failure-path stub returns. It
 // stands in for an endpoint/generation error (for example an unreachable model
 // endpoint) so the test can assert the error is surfaced clearly.
-var failingGeneratorErr = errors.New("generation endpoint unreachable")
+var errFailingGenerator = errors.New("generation endpoint unreachable")
 
 // blockingGenerator blocks until its context is done and then reports the
 // context error. It is used to prove the rag layer does not hang on
@@ -31,15 +31,15 @@ func (blockingGenerator) Generate(ctx context.Context, _ string) (string, error)
 // rag layer returns the generator error unwrapped and an empty answer, so a
 // caller can never mistake a failed run for a successful one.
 func TestReliabilityGenerationErrorIsClearAndNoPartialWrite(t *testing.T) {
-	generator := stubGenerator{err: failingGeneratorErr}
+	generator := stubGenerator{err: errFailingGenerator}
 
 	answer, err := Answer(t.Context(), generator, "What is the late fee?", e2eDocuments())
 	if err == nil {
 		t.Fatal("Answer() error = nil, want generation error")
 	}
 
-	if !errors.Is(err, failingGeneratorErr) {
-		t.Fatalf("Answer() error = %v, want %v", err, failingGeneratorErr)
+	if !errors.Is(err, errFailingGenerator) {
+		t.Fatalf("Answer() error = %v, want %v", err, errFailingGenerator)
 	}
 
 	if answer != "" {

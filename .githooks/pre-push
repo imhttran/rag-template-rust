@@ -56,5 +56,16 @@ INTEGRATION_TEST_STRICT="$RAG_REQUIRE_INTEGRATION" \
 INTEGRATION_TEST_HINT='pre-push: start the database (docker compose up -d --wait) and create rag_test once, see the README' \
 	"$integration_test_agent"
 
+# Rust and web checks. Go stays in the repository until RUST-007; the integration
+# check above remains. The Makefile targets are the single source of truth.
+echo "pre-push: rust build/test/clippy (make rust-build rust-test rust-clippy)"
+make rust-build rust-test rust-clippy
+
+echo "pre-push: make web-check-env"
+make web-check-env
+
+echo "pre-push: web production build (make web-build)"
+make web-build
+
 echo
 echo "pre-push: ok"

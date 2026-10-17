@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	schemaVersion = "rag-retrieval/v1"
+	schemaVersion   = "rag-retrieval/v1"
 	maxRequestBytes = 1 << 20
-	allowedEnv    = "RAG_RETRIEVAL_ALLOWED_CORPORA"
+	allowedEnv      = "RAG_RETRIEVAL_ALLOWED_CORPORA"
 )
 
 type request struct {

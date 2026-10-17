@@ -79,3 +79,29 @@ git config core.hooksPath .githooks
 
 Bypass the commit hook with `git commit --no-verify`, or the push hook with
 `git push --no-verify`.
+
+## Installing the hooks
+
+The hooks are version-controlled under `.githooks/`. Enable them once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Bypass a single operation with `git commit --no-verify` / `git push --no-verify`.
+`core.hooksPath` is repository-local configuration, so each clone must run the
+command above. Verify with `git config --get core.hooksPath` (expect `.githooks`).
+
+## Rust and web checks
+
+While Go remains in the repository, both hooks also gate the Rust port and the
+Next.js prototype, reusing the Makefile targets so the commands never drift:
+
+- `pre-commit` adds `make rust-fmt` (`cargo fmt --check`) and `make web-typecheck`
+  (`tsc --noEmit`).
+- `pre-push` adds `make rust-build rust-test rust-clippy` (`cargo build --locked`,
+  `cargo test --locked`, and `cargo clippy --locked --all-targets -- -D warnings`)
+  and `make web-build` (the Next.js production build).
+
+The Rust package still lives at `rust/`; the targets use that path until RUST-007
+moves it to the repository root.
