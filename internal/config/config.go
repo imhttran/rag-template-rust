@@ -1,0 +1,589 @@
+// Package config holds the runtime settings shared by the commands. Every
+// setting can be overridden with an environment variable so the code does not
+// have to change between machines.
+//
+// A setting that is absent (unset or blank) falls back to its default. A setting
+// that is present but invalid is an error, never a silent fallback: a typo in
+// CHUNK_SIZE should stop the command with a message naming the variable instead
+// of quietly using the default.
+package config
+
+import (
+	"context"
+	"fmt"
+	"math"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"rag-template/internal/embedding"
+	"rag-template/internal/generation"
+	"rag-template/internal/ollama"
+	"rag-template/internal/provider"
+)
+
+const (
+	DefaultOllamaURL   = "http://localhost:11434"
+	DefaultEmbedModel  = "nomic-embed-text"
+	DefaultChatModel   = "qwen3.8:27b-mlx"
+	DefaultDatabaseURL = "postgres://rag:rag@127.0.0.1:5434/rag?sslmode=disable"
+	DefaultTopK        = 4
+
+	// DefaultEmbedDim is the embedding dimension the documents.embedding column
+	// is declared with in migrations/001_init.sql and the dimension
+	// nomic-embed-text produces. EMBED_DIM must match the stored column; a
+	// mismatch is caught by the schema guard in internal/ingestion before any
+	// embedding or retrieval work runs.
+	DefaultEmbedDim = 768
+
+	// DefaultEmbedProvider and DefaultGenProvider name the provider registry
+	// entries the factory methods resolve when EMBED_PROVIDER / GEN_PROVIDER
+	// are unset.
+	DefaultEmbedProvider = provider.Default
+	DefaultGenProvider   = provider.Default
+
+	// DefaultChunkSize and DefaultChunkOverlap are the word counts chunking
+	// splits a section into, used by cmd/ingest. 50/20 measured best on the
+	// example corpus (see scripts/sweep.sh).
+	DefaultChunkSize    = 50
+	DefaultChunkOverlap = 20
+
+	// DefaultEmbedWorkers bounds how many embedding calls cmd/ingest runs
+	// concurrently. The default is deliberately modest: Ollama serves requests
+	// from a single model instance, so a larger fan-out mostly queues server
+	// side while adding memory pressure locally.
+	DefaultEmbedWorkers = 4
+
+	// DefaultEmbedRetries is how many times a transient embedding failure is
+	// retried before the ingest fails. The default is small because a failure
+	// that survives a few backoffs is more likely persistent than transient.
+	DefaultEmbedRetries = 3
+
+	// DefaultMinSimilarity is the lowest cosine similarity a retrieved
+	// document may have to be used as context.
+	DefaultMinSimilarity = 0.6
+
+	// DefaultLLMRerank is whether cmd/eval also reranks with the chat model.
+	// Off by default: it is slower and needs OLLAMA_CHAT_MODEL.
+	DefaultLLMRerank = false
+
+	// DefaultLexicalRerank is whether cmd/eval reranks candidates lexically.
+	// Off by default: the K baselines are reported on their own.
+	DefaultLexicalRerank = false
+
+	// DefaultRerankTimeout bounds how long the LLM reranker may wait for the
+	// chat model before falling back to the fused order. It is deliberately 0
+	// (guard disabled), so an unset RERANK_TIMEOUT preserves the current
+	// behavior and introduces no default drift. It is scoped to the reranker
+	// call only; REQUEST_TIMEOUT still bounds the whole request.
+	DefaultRerankTimeout = time.Duration(0)
+
+	// DefaultAnswerabilityGate is whether cmd/eval asks the chat model whether
+	// the retrieved evidence can answer each question. Off by default: it adds
+	// one chat-model call per case.
+	DefaultAnswerabilityGate = false
+
+	// DefaultFactJudge is whether cmd/eval asks the chat model which expected
+	// facts the retrieved evidence supports. Off by default: it adds one
+	// chat-model call per case that lists facts.
+	DefaultFactJudge = false
+
+	// DefaultRewriteOnly is whether cmd/eval retrieves with the rewritten query
+	// alone, instead of the original plus the rewritten query. Off by default:
+	// it is an experiment comparing replacing the original query against
+	// keeping it alongside the rewrite.
+	DefaultRewriteOnly = false
+
+	// DefaultQueryRewrite is whether the question is rewritten into a search
+	// query with the chat model before retrieval. On by default: it improves
+	// recall on the example corpus, at the cost of one chat-model call per query.
+	DefaultQueryRewrite = true
+
+	// DefaultRagAnswerabilityGate is whether cmd/rag checks answerability with
+	// the chat model before answering. On by default.
+	DefaultRagAnswerabilityGate = true
+
+	// DefaultRagCitationValidation is whether cmd/rag validates the model's
+	// [source - section] citations against the retrieved documents and repairs an
+	// answer whose citations do not resolve. Off by default, so the default
+	// cmd/rag output is byte-identical to the answer path without validation.
+	DefaultRagCitationValidation = false
+
+	// DefaultFinalK is how many fused candidates cmd/rag keeps after hybrid
+	// retrieval, before the matched sections are expanded.
+	DefaultFinalK = 3
+
+	// DefaultExpandLimit caps how many section chunks cmd/rag sends as context.
+	DefaultExpandLimit = 20
+
+	// DefaultContextBudget caps the estimated size of the context cmd/rag sends
+	// to the model. The size is a provider-neutral byte-based estimate (chunk
+	// content length in bytes plus a fixed per-chunk overhead), not
+	// tokenizer-accurate token counting. It is deliberately 0 (disabled), so an
+	// unset CONTEXT_BUDGET keeps the current chunk-count behaviour and no default
+	// drift is introduced.
+	DefaultContextBudget = 0
+
+	// DefaultMaxQuestionBytes caps the size in bytes of the user question the
+	// commands accept. It is deliberately 0 (disabled), so an unset
+	// MAX_QUESTION_BYTES keeps the current behavior and introduces no default
+	// drift: an oversized question is only rejected when a limit is explicitly
+	// opt-in via the environment.
+	DefaultMaxQuestionBytes = 0
+
+	// DefaultMaxInputBytes caps the size in bytes of the untrusted retrieved
+	// context sent to the model. Like DefaultMaxQuestionBytes it is deliberately
+	// 0 (disabled) so an unset MAX_INPUT_BYTES preserves the current behavior and
+	// introduces no default drift.
+	DefaultMaxInputBytes = 0
+
+	// DefaultLanguage is the corpus language used to select the PostgreSQL
+	// full-text search configuration for ingestion and retrieval. It is empty by
+	// default, which keeps the baseline 'english' configuration, so an unset
+	// CORPUS_LANGUAGE introduces no retrieval behavior change.
+	DefaultLanguage = ""
+
+	// DefaultRequestTimeout bounds every network call the commands make.
+	DefaultRequestTimeout = 5 * time.Minute
+
+	// OutputHuman and OutputJSON are the accepted values of the OBSERVABILITY_FORMAT
+	// setting. OutputHuman is the default: existing human-readable stage output is
+	// preserved unchanged. OutputJSON is opt-in and emits one structured record per
+	// run via log/slog instead of the human-readable lines.
+	OutputHuman = "human"
+	OutputJSON  = "json"
+
+	// DefaultObservabilityFormat selects the human-readable output. An unset or
+	// blank OBSERVABILITY_FORMAT keeps the current output and introduces no
+	// default drift; JSON must be requested explicitly.
+	DefaultObservabilityFormat = OutputHuman
+)
+
+// Config holds the runtime settings.
+type Config struct {
+	OllamaURL             string
+	EmbedModel            string
+	EmbedDim              int
+	ChatModel             string
+	DatabaseURL           string
+	Question              string
+	EmbedProvider         string
+	GenProvider           string
+	Language              string
+	ChunkSize             int
+	ChunkOverlap          int
+	TopK                  int
+	FinalK                int
+	ExpandLimit           int
+	ContextBudget         int
+	MaxQuestionBytes      int
+	MaxInputBytes         int
+	EmbedWorkers          int
+	EmbedRetries          int
+	MinSimilarity         float64
+	LexicalRerank         bool
+	LLMRerank             bool
+	RagLLMRerank          bool
+	RerankTimeout         time.Duration
+	AnswerabilityGate     bool
+	FactJudge             bool
+	RewriteOnly           bool
+	RagAnswerabilityGate  bool
+	RagCitationValidation bool
+	RequestTimeout        time.Duration
+	QueryRewrite          bool
+	ObservabilityFormat   string
+}
+
+// Load reads the settings from the environment, falling back to the defaults
+// when a setting is absent.
+//
+// It returns an error naming the offending variable when a present setting
+// cannot be parsed or is out of range, when CHUNK_OVERLAP is not smaller than
+// CHUNK_SIZE, and when EMBED_PROVIDER / GEN_PROVIDER names a provider that is
+// not registered (a present-but-unknown provider fails fast, never a silent
+// ignore). Invalid values are never silently replaced with defaults.
+func Load() (Config, error) {
+	cfg := Config{
+		OllamaURL:     envOrDefault("OLLAMA_URL", DefaultOllamaURL),
+		EmbedModel:    envOrDefault("OLLAMA_EMBED_MODEL", DefaultEmbedModel),
+		ChatModel:     envOrDefault("OLLAMA_CHAT_MODEL", DefaultChatModel),
+		DatabaseURL:   envOrDefault("DATABASE_URL", DefaultDatabaseURL),
+		EmbedProvider: envOrDefault("EMBED_PROVIDER", DefaultEmbedProvider),
+		GenProvider:   envOrDefault("GEN_PROVIDER", DefaultGenProvider),
+		// Language selects the corpus's full-text search configuration. Empty keeps
+		// the baseline 'english' configuration.
+		Language: envOrDefault("CORPUS_LANGUAGE", DefaultLanguage),
+		// Question has no default: the rag command requires one.
+		Question: envOrDefault("QUESTION", ""),
+	}
+
+	// Provider names are validated here so an unknown EMBED_PROVIDER / GEN_PROVIDER
+	// fails fast at Load with an error naming the variable and the value, rather
+	// than surfacing later (or being silently ignored) when an embedder or
+	// generator is resolved. An unset or blank variable keeps the default and is
+	// not an error.
+	if err := validateEmbedProvider(cfg.EmbedProvider); err != nil {
+		return Config{}, err
+	}
+
+	if err := validateGenProvider(cfg.GenProvider); err != nil {
+		return Config{}, err
+	}
+
+	var err error
+
+	if cfg.EmbedDim, err = envPositiveInt("EMBED_DIM", DefaultEmbedDim); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.ChunkSize, err = envPositiveInt("CHUNK_SIZE", DefaultChunkSize); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.ChunkOverlap, err = envNonNegativeInt("CHUNK_OVERLAP", DefaultChunkOverlap); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.TopK, err = envPositiveInt("TOP_K", DefaultTopK); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.FinalK, err = envPositiveInt("FINAL_K", DefaultFinalK); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.ExpandLimit, err = envPositiveInt("EXPAND_LIMIT", DefaultExpandLimit); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.ContextBudget, err = envNonNegativeInt("CONTEXT_BUDGET", DefaultContextBudget); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.MaxQuestionBytes, err = envNonNegativeInt("MAX_QUESTION_BYTES", DefaultMaxQuestionBytes); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.MaxInputBytes, err = envNonNegativeInt("MAX_INPUT_BYTES", DefaultMaxInputBytes); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.EmbedWorkers, err = envPositiveInt("EMBED_WORKERS", DefaultEmbedWorkers); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.EmbedRetries, err = envNonNegativeInt("EMBED_RETRIES", DefaultEmbedRetries); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.MinSimilarity, err = envUnitFloat("MIN_SIMILARITY", DefaultMinSimilarity); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.LexicalRerank, err = envBool("EVAL_LEXICAL_RERANK", DefaultLexicalRerank); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.LLMRerank, err = envBool("EVAL_LLM_RERANK", DefaultLLMRerank); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.RagLLMRerank, err = envBool("RAG_LLM_RERANK", false); err != nil {
+		return Config{}, err
+	}
+
+	// The reranker latency guard. 0 (the default) disables the guard; an
+	// explicit positive duration bounds the reranker call.
+	if cfg.RerankTimeout, err = envNonNegativeDuration("RERANK_TIMEOUT", DefaultRerankTimeout); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.AnswerabilityGate, err = envBool("EVAL_ANSWERABILITY_GATE", DefaultAnswerabilityGate); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.FactJudge, err = envBool("EVAL_FACT_JUDGE", DefaultFactJudge); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.RewriteOnly, err = envBool("EVAL_REWRITE_ONLY", DefaultRewriteOnly); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.RagAnswerabilityGate, err = envBool("RAG_ANSWERABILITY_GATE", DefaultRagAnswerabilityGate); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.RagCitationValidation, err = envBool("RAG_CITATION_VALIDATION", DefaultRagCitationValidation); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.RequestTimeout, err = envPositiveDuration("REQUEST_TIMEOUT", DefaultRequestTimeout); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.QueryRewrite, err = envBool("QUERY_REWRITE", DefaultQueryRewrite); err != nil {
+		return Config{}, err
+	}
+
+	if cfg.ObservabilityFormat, err = envOutputFormat("OBSERVABILITY_FORMAT", DefaultObservabilityFormat); err != nil {
+		return Config{}, err
+	}
+
+	// Chunk overlap must leave the window advancing: a step of chunkSize-overlap
+	// has to stay positive, so overlap < chunkSize.
+	if cfg.ChunkOverlap >= cfg.ChunkSize {
+		return Config{}, fmt.Errorf(
+			"CHUNK_OVERLAP (%d) must be smaller than CHUNK_SIZE (%d)",
+			cfg.ChunkOverlap,
+			cfg.ChunkSize,
+		)
+	}
+
+	return cfg, nil
+}
+
+// validateEmbedProvider rejects an EMBED_PROVIDER value that is not registered
+// in the provider registry. An empty value resolves to the registry default and
+// is always valid. The error names both the variable and the offending value.
+func validateEmbedProvider(name string) error {
+	if provider.HasEmbedder(name) {
+		return nil
+	}
+
+	return fmt.Errorf("EMBED_PROVIDER=%q is not a registered provider", name)
+}
+
+// validateGenProvider rejects a GEN_PROVIDER value that is not registered in
+// the provider registry. An empty value resolves to the registry default and is
+// always valid. The error names both the variable and the offending value.
+func validateGenProvider(name string) error {
+	if provider.HasGenerator(name) {
+		return nil
+	}
+
+	return fmt.Errorf("GEN_PROVIDER=%q is not a registered provider", name)
+}
+
+// ObservabilityJSON reports whether the configured output format selects the
+// opt-in JSON structured record instead of the human-readable stream.
+func (c Config) ObservabilityJSON() bool {
+	return c.ObservabilityFormat == OutputJSON
+}
+
+// chunkerConfigVersion identifies the serialization format of ChunkerConfig.
+// Bump it when the chunking algorithm changes in a way that invalidates stored
+// chunkings, so previously ingested documents are re-ingested. It was bumped to
+// v2 when chunk indexing became document-global: existing rows carry
+// section-local indexes and must be re-chunked under the corrected numbering.
+const chunkerConfigVersion = "v2"
+
+// ChunkerConfig returns a stable, canonical representation of the chunker
+// settings derived from ChunkSize and ChunkOverlap. Two Configs with the same
+// size and overlap produce the same string; changing either produces a
+// different one. It is recorded as ingestion provenance and compared on
+// re-ingest to decide whether a document must be chunked again.
+func (c Config) ChunkerConfig() string {
+	return fmt.Sprintf("chunker=%s;size=%d;overlap=%d", chunkerConfigVersion, c.ChunkSize, c.ChunkOverlap)
+}
+
+// providerClient builds the provider settings the registry needs to construct a
+// vendor client.
+func (c Config) providerClient() provider.Client {
+	return provider.Client{
+		OllamaURL:      c.OllamaURL,
+		EmbedModel:     c.EmbedModel,
+		ChatModel:      c.ChatModel,
+		RequestTimeout: c.RequestTimeout,
+	}
+}
+
+// Embedder resolves the configured EMBED_PROVIDER through the provider registry
+// and returns an embedding.Embedder. An empty provider falls back to the ollama
+// default; an unregistered provider returns a non-nil error.
+func (c Config) Embedder() (embedding.Embedder, error) {
+	return provider.Embedder(c.EmbedProvider, c.providerClient())
+}
+
+// Generator resolves the configured GEN_PROVIDER through the provider registry
+// and returns a generation.Generator. An empty provider falls back to the ollama
+// default; an unregistered provider returns a non-nil error.
+func (c Config) Generator() (generation.Generator, error) {
+	return provider.Generator(c.GenProvider, c.providerClient())
+}
+
+// OllamaClient returns a client for the configured Ollama server.
+func (c Config) OllamaClient() *ollama.Client {
+	return ollama.New(c.OllamaURL, &http.Client{Timeout: c.RequestTimeout})
+}
+
+// Connect opens a connection to the configured database.
+func (c Config) Connect(ctx context.Context) (*pgx.Conn, error) {
+	conn, err := pgx.Connect(ctx, c.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("connect to postgres: %w", err)
+	}
+
+	return conn, nil
+}
+
+// envValue returns the trimmed value of key and whether it is present. An unset
+// or blank variable counts as absent, so an empty .env entry uses the default.
+func envValue(key string) (string, bool) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return "", false
+	}
+
+	return value, true
+}
+
+func envOrDefault(key, fallback string) string {
+	if value, ok := envValue(key); ok {
+		return value
+	}
+
+	return fallback
+}
+
+// envPositiveInt reads an integer setting that must be greater than zero.
+func envPositiveInt(key string, fallback int) (int, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer, got %q", key, raw)
+	}
+
+	if value <= 0 {
+		return 0, fmt.Errorf("%s must be greater than 0, got %d", key, value)
+	}
+
+	return value, nil
+}
+
+// envNonNegativeInt is envPositiveInt but accepts zero, for settings where zero
+// is a valid value rather than an absent one (chunk overlap, disabled limits).
+func envNonNegativeInt(key string, fallback int) (int, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer, got %q", key, raw)
+	}
+
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be 0 or greater, got %d", key, value)
+	}
+
+	return value, nil
+}
+
+// envUnitFloat reads a similarity-style setting that must lie within [0, 1].
+func envUnitFloat(key string, fallback float64) (float64, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a number, got %q", key, raw)
+	}
+
+	if math.IsNaN(value) || value < 0 || value > 1 {
+		return 0, fmt.Errorf("%s must be between 0 and 1, got %q", key, raw)
+	}
+
+	return value, nil
+}
+
+// envPositiveDuration reads a duration setting that must be greater than zero.
+func envPositiveDuration(key string, fallback time.Duration) (time.Duration, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a duration such as 30s or 5m, got %q", key, raw)
+	}
+
+	if value <= 0 {
+		return 0, fmt.Errorf("%s must be greater than 0, got %q", key, raw)
+	}
+
+	return value, nil
+}
+
+// envNonNegativeDuration is envPositiveDuration but accepts zero, for settings
+// where zero means disabled rather than absent (the reranker latency guard).
+func envNonNegativeDuration(key string, fallback time.Duration) (time.Duration, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a duration such as 30s or 5m, got %q", key, raw)
+	}
+
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be 0 or greater, got %q", key, raw)
+	}
+
+	return value, nil
+}
+
+// envBool reads a boolean setting.
+func envBool(key string, fallback bool) (bool, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean such as true or false, got %q", key, raw)
+	}
+
+	return value, nil
+}
+
+// envOutputFormat reads the observability output-format setting. It accepts only
+// the enumerated values (human, json); a present but unknown value is an error
+// naming the variable, never a silent fallback to the default.
+func envOutputFormat(key, fallback string) (string, error) {
+	raw, ok := envValue(key)
+	if !ok {
+		return fallback, nil
+	}
+
+	switch strings.ToLower(raw) {
+	case OutputHuman:
+		return OutputHuman, nil
+	case OutputJSON:
+		return OutputJSON, nil
+	default:
+		return "", fmt.Errorf(
+			"%s must be %q or %q, got %q",
+			key,
+			OutputHuman,
+			OutputJSON,
+			raw,
+		)
+	}
+}
