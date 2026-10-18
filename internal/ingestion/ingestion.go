@@ -362,8 +362,11 @@ func (i *Ingester) IsUpToDate(
 // here, including language and corpus: re-ingesting an unchanged file under a
 // different corpus or language must replace the stored rows, not skip them.
 //
-// Nullable columns are compared through COALESCE so an empty provenance value
-// matches a stored NULL (the representation ingestion uses for "unset"). The
+// Language and corpus are nullable and are compared through COALESCE so an
+// empty provenance value matches a stored NULL (the representation ingestion
+// uses for "unset"). The content hash, chunker config, and embedding model are
+// compared exactly: an empty supplied value never matches a stored NULL, so a
+// document without recorded provenance is conservatively re-ingested. The
 // embedding dimension is only compared when the caller pinned one.
 func provenanceMatchQuery(source string, provenance Provenance) (string, []any) {
 	clauses := []string{

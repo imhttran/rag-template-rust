@@ -29,6 +29,19 @@ func TestProvenanceMatchQueryComparesLanguageAndCorpus(t *testing.T) {
 		}
 	}
 
+	// The empty-provenance path is intentionally conservative: only language and
+	// corpus treat NULL as empty. A NULL content hash/model/chunker config must
+	// not match an empty supplied value, so the document is re-ingested.
+	for _, unexpected := range []string{
+		"COALESCE(content_hash",
+		"COALESCE(chunker_config",
+		"COALESCE(embed_model",
+	} {
+		if strings.Contains(query, unexpected) {
+			t.Fatalf("query unexpectedly wraps %q:\n%s", unexpected, query)
+		}
+	}
+
 	if strings.Contains(query, "embedding_dim = $7") {
 		t.Fatalf("unpinned dimension emitted a dimension clause:\n%s", query)
 	}

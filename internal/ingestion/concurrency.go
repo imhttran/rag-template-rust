@@ -43,9 +43,14 @@ func mapOrdered[T any, R any](
 		firstErr error
 	)
 
+schedule:
 	for index, input := range inputs {
 		select {
 		case <-ctx.Done():
+			// Stop scheduling new work once the context is canceled. Without this
+			// break the loop keeps iterating every remaining input and can still
+			// start goroutines with an already-canceled context.
+			break schedule
 		case sem <- struct{}{}:
 			wg.Add(1)
 

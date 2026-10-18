@@ -533,6 +533,46 @@ func TestIsUpToDateIntegrationZeroDimension(t *testing.T) {
 	}
 }
 
+// TestIsUpToDateIntegrationEmptyProvenanceIsConservative locks the NULL/empty
+// contract: a document written without provenance (ReplaceDocument) stores NULL
+// columns, and an empty supplied provenance must not be treated as up to date.
+func TestIsUpToDateIntegrationEmptyProvenanceIsConservative(t *testing.T) {
+	ctx := context.Background()
+	requireDatabase(t)
+
+	resetTestDocument(t, ctx)
+
+	ingester := newIngester(t)
+
+	if err := ingester.ReplaceDocument(ctx, testSource, []chunking.Chunk{
+		{Section: "Fees", Index: 0, Content: "legacy chunk"},
+	}); err != nil {
+		t.Fatalf("seed replace: %v", err)
+	}
+
+	upToDate, err := ingester.IsUpToDate(ctx, testSource, Provenance{})
+	if err != nil {
+		t.Fatalf("IsUpToDate (empty provenance): %v", err)
+	}
+
+	if upToDate {
+		t.Fatal("empty provenance matched stored NULL provenance")
+	}
+
+	upToDate, err = ingester.IsUpToDate(ctx, testSource, Provenance{
+		ContentHash:   "hash-1",
+		EmbedModel:    "fake",
+		ChunkerConfig: "size=50,overlap=20",
+	})
+	if err != nil {
+		t.Fatalf("IsUpToDate (new provenance): %v", err)
+	}
+
+	if upToDate {
+		t.Fatal("new provenance matched legacy NULL provenance")
+	}
+}
+
 // TestIsUpToDateIntegrationLanguageAndCorpus guards the metadata columns that
 // must invalidate an otherwise unchanged document. The ingest CLI reads both
 // from the environment, so re-running it with a new RAG_CORPUS or
