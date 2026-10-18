@@ -124,6 +124,23 @@ pub struct SqlHit {
     pub keyword_score: f64,
 }
 
+/// A `(source, section)` pair selecting the chunks [`PgStore::section_chunks`]
+/// returns, matching the Go `retrieval.SectionKey`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SectionKey {
+    /// The `source` column value.
+    pub source: String,
+    /// The `section` column value.
+    pub section: String,
+}
+
+/// Returns the per-section row cap for a section read: `max(1, limit /
+/// key_count)`, matching the Go `SectionChunksFiltered` split. A zero
+/// `key_count` yields `max(1, limit)`.
+pub fn section_cap(limit: usize, key_count: usize) -> usize {
+    (limit / key_count.max(1)).max(1)
+}
+
 impl PgStore {
     /// Builds a new store by creating a connection pool from `dsn`.
     pub fn connect(dsn: &str) -> Result<PgStore, PgStoreError> {
@@ -275,6 +292,75 @@ impl PgStore {
                 })
             })
             .collect()
+    }
+
+    /// Issues `SELECT 1` so a caller can fail fast, naming the store, before any
+    /// retrieval work runs. [`create_pool`] connects lazily, so this is the first
+    /// point an unreachable database is observed.
+    pub fn ping(&self) -> Result<(), PgStoreError> {
+        let mut conn = self.connection()?;
+        conn.execute("SELECT 1", &[])
+            .map_err(|err| PgStoreError::Query(err.to_string()))?;
+        Ok(())
+    }
+
+    /// Reads the leading chunks of each requested `(source, section)` pair in
+    /// `corpus`, ordered by source, section, and chunk index.
+    ///
+    /// Mirrors the Go `SectionChunksFiltered` contract
+    /// (`internal/retrieval/retrieval.go:415`): `limit` is split across the
+    /// sections with a per-section cap of [`section_cap`]`(limit, keys.len())`
+    /// applied through `ROW_NUMBER() OVER (PARTITION BY source, section ORDER BY
+    /// chunk_index)`, so one long section cannot starve the others. An empty key
+    /// set returns an empty result without issuing a query.
+    ///
+    /// Divergence: Go's harness passes a zero `Filter`, so its expansion is not
+    /// corpus-scoped. Every `PgStore` read is corpus-scoped, so this read is too;
+    /// the two agree on a database holding a single corpus.
+    pub fn section_chunks(
+        &self,
+        corpus: &str,
+        keys: &[SectionKey],
+        limit: usize,
+    ) -> Result<Vec<StoredChunkRow>, PgStoreError> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        let per_section = section_cap(limit, keys.len()) as i64;
+
+        let mut placeholders = Vec::with_capacity(keys.len());
+        let mut params: Vec<&(dyn ToSql + Sync)> = Vec::with_capacity(keys.len() * 2 + 2);
+        for (index, key) in keys.iter().enumerate() {
+            placeholders.push(format!("(${}, ${})", 2 * index + 1, 2 * index + 2));
+            params.push(&key.source);
+            params.push(&key.section);
+        }
+        let corpus_index = keys.len() * 2 + 1;
+        params.push(&corpus);
+        params.push(&per_section);
+
+        let sql = format!(
+            "SELECT id, content, source, section, chunk_index, language, page, corpus, \
+             content_hash, embed_model, embedding_dim, chunker_config, \
+             ingested_at::text, embedding::text \
+             FROM ( \
+                 SELECT *, ROW_NUMBER() OVER ( \
+                     PARTITION BY source, section ORDER BY chunk_index \
+                 ) AS section_rank \
+                 FROM documents \
+                 WHERE (source, section) IN ({}) AND corpus = ${corpus_index} \
+             ) AS ranked \
+             WHERE section_rank <= ${} \
+             ORDER BY source, section, chunk_index",
+            placeholders.join(", "),
+            corpus_index + 1
+        );
+
+        let mut conn = self.connection()?;
+        let rows = conn
+            .query(sql.as_str(), &params)
+            .map_err(|err| PgStoreError::Query(err.to_string()))?;
+        rows.iter().map(row_to_chunk).collect()
     }
 
     /// Fetches a single row by its database-assigned `id`.
@@ -540,6 +626,23 @@ mod tests {
     fn parse_vector_rejects_garbage() {
         assert!(parse_vector("not-a-vector").is_err());
         assert!(parse_vector("[1,x]").is_err());
+    }
+
+    #[test]
+    fn section_cap_splits_the_limit_across_sections() {
+        assert_eq!(section_cap(20, 3), 6);
+        assert_eq!(section_cap(20, 1), 20);
+        assert_eq!(section_cap(20, 40), 1);
+        assert_eq!(section_cap(0, 2), 1);
+    }
+
+    #[test]
+    fn empty_section_keys_return_nothing_without_a_query() {
+        // The DSN points at a closed port: any query would fail, so an Ok(empty)
+        // proves the empty key set short-circuits before touching the database.
+        let store = PgStore::connect("postgres://nobody:nothing@127.0.0.1:1/none").unwrap();
+        let rows = store.section_chunks("any", &[], 20).unwrap();
+        assert!(rows.is_empty());
     }
 
     #[test]

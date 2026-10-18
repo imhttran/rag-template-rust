@@ -14,6 +14,8 @@ Evidence for `docs/plans/PLAN-RUST-MIGRATION.md`. Reference SHA frozen by RUST-0
 | `dependency-decisions.md` | Retained / adopted / selected Rust crates, the pinned-toolchain constraint, the Markdown/PDF adoption gate, and the verification behind each |
 | `cli-fullsuite-timeout-evidence.md` | Preserved evidence for the pre-existing full `internal/cli` suite stall (commands, stacks, attribution, reproduction guidance) |
 | `RUST-003-fixture-parity.md` | RUST-003 section/chunk acceptance matrix vs the pinned Go reference (provenance, repairs, per-case results, the one unresolved PDF-signaling difference) |
+| `RUST-007D-bilingual-contract.md` | RUST-007D frozen `cmd/expbilingual` contract, capability inventory, divergences, and the Go→Rust invocation mapping for all four commands |
+| `RUST-007D-live-model-evidence.md` | RUST-007D live-model groundedness/citation closure requirement (status UNMET) and the run that would satisfy it |
 | `sop-cargo-support.patch` | Reviewed SOP Cargo-support patch, base `a46187b` (SHA-256 `79dd707e…b893`) |
 | `sop-cargo-support-integrated.patch` | The same patch integrated onto current `origin/main` `a9f0495` (SHA-256 `48530f34…4ac6`) |
 

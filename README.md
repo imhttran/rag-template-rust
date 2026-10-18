@@ -81,6 +81,7 @@ setup details, see the [usage guide](docs/guides/usage.md).
 | `cmd/rag "question"` | Answer a question from the stored chunks | `make ask Q="…"` |
 | `cmd/eval` | Score retrieval against `evals/retrieval.json` | `make eval` |
 | `cmd/expbilingual` | Run the RAG-024 bilingual evaluation arms over a frozen split | — (run directly) |
+| `cargo run --manifest-path rust/Cargo.toml --bin expbilingual` | Rust equivalent of `cmd/expbilingual` (same arms, environment, output, and cache format; reads are scoped to `RAG_CORPUS`, default `trusted`) | — (run directly) |
 
 Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`,
 `fmt-json`, `integration`, and `sweep` (compares `cmd/eval` metrics across a
@@ -91,6 +92,9 @@ flags and environment settings.
 retrieval. It selects an arm with `ARM` (`A`, `B`, `C`, `D1`, `D2`, `E`, or
 `all`), reads its cases from `EVAL_DATASET`, pins generation (temperature 0,
 fixed seed, bounded output) and caches results by case id and configuration.
+The Rust `expbilingual` binary is evaluation-only in the same way; its contract
+and Go-to-Rust invocation mapping are in
+[RUST-007D-bilingual-contract.md](docs/reports/rust-migration/RUST-007D-bilingual-contract.md).
 
 ## Documentation
 

@@ -8,9 +8,11 @@
 //! replacement ([`transaction`]), the ingest pipeline caller ([`pipeline`]),
 //! and the provider integration: a shared Ollama HTTP client ([`ollama`]),
 //! embedding ([`embedding`]) and generation ([`generation`]) request ports, and
-//! provider registration/resolution ([`provider`]).
+//! provider registration/resolution ([`provider`]), and the evaluation-only
+//! bilingual experiment harness ([`bilingual`]).
 
 pub mod answer;
+pub mod bilingual;
 pub mod chunker;
 pub mod config;
 pub mod document;

@@ -23,6 +23,10 @@ path = "src/bin/query.rs"
 name = "eval"
 path = "src/bin/eval.rs"
 
+[[bin]]
+name = "expbilingual"
+path = "src/bin/expbilingual.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

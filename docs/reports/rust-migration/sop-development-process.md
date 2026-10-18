@@ -7,7 +7,7 @@ values that cannot be established are marked UNKNOWN, and agent calls are never
 equated with user turns.
 
 - First recorded: 2026-10-17
-- Last updated: 2026-10-18 (RUST-007 eval parity fixed via shared SQL retrieval; parity and affected suites PASS; pending gate untouched)
+- Last updated: 2026-10-18 (RUST-007D bilingual implementation and scripted parity PASS; live-model criterion UNMET; pending gate)
 - SOP: `sop` on PATH, `sop version` = `sop dev` (source base `c1db733` plus the
   reviewed Cargo support and this session's agent-Cargo/gate changes;
   `/home/tomtran/go/bin/sop`, SHA-256
@@ -1785,3 +1785,35 @@ gate remains pending and was not approved.
   explicit unmet closure requirements.
 - Pending approval: **RUST-007 `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**.
 - No commit, push, merge, `state.db` edit, or budget reset.
+
+## 33. RUST-007D Claude recovery and bilingual implementation
+
+Date: 2026-10-18. One bounded RUST-007D recovery was run with the Claude command adapter after the installed SOP snapshot fix, using the existing task budget. No DeepSeek retry was made.
+
+### 33.1 Backend and context
+
+- Installed SOP: `fff8d742...`, source revision `7a1d1759...`, includes the Git-aware `SnapshotFiles` fix. No SOP rebuild.
+- Effective implementation backend: `SOP_AGENT_PROVIDER=command` with the Claude Code adapter, authenticated through the **Claude.ai Pro subscription** (`authMethod: claude.ai`), `jq` 1.7. No paid-API key and no invented spending cap.
+- The SOP report header prints `Provider: ollama` because the configured provider remains ollama; the startup/effective provider was `command`. This is a reporting-label discrepancy, not the executed backend.
+- `SOP_TASK_INPUTS` supplied a 4.2 KB recovery context with the Go `cmd/expbilingual` contract and the verified Rust SQL/retrieval/API signatures.
+- Tool restrictions: `SOP_CLAUDE_ISOLATE=1`; explicit cargo rules for build/test/fmt/clippy/generate-lockfile; no git commit/push/merge/reset/clean. The command backend does not enforce the native toolharness policy; the wrapper allow-list was the restriction.
+
+### 33.2 Outcome
+
+- Validation: all build/test/lint commands **PASS**.
+- Objective criteria 1–3 and 5: **met** (invocation mappings, arms/dataset/env, pinned generation/cache, no required check unverified).
+- Criterion 4 (live-model groundedness/citations): **UNMET**, as documented in `RUST-007D-live-model-evidence.md`. Scripted parity does not close it.
+- Outcome: `PARTIAL`; lifecycle `NEEDS_HUMAN`; RUST-007D is `PLANNED` with a pending gate. The run made meaningful repository changes; this is a required live-evidence boundary, not a no-progress failure.
+- Implementation: `rust/src/bilingual.rs`, `rust/src/bin/expbilingual.rs`, `PgStore::section_chunks` in `rust/src/storage_pg.rs`, `rust/tests/expbilingual_binary.rs`, `rust/tests/section_chunks_pg.rs`, and `rust/acceptance/bilingual_parity` with Go/Rust parity tests. The harness is evaluation-only and adds no writes.
+- Budget: task attempts **2/3**; continuations **2/4** (2 remaining). Aggregate run counts: 4 attempts, 2 continuations, 4 invocations, 9 model calls. Current run metrics: agent calls 2, validation runs 1, review runs 1, plan repairs 0, wall 30m 26s. No budget reset.
+
+### 33.3 Remaining open requirements
+
+- Live Ollama ingest → query → cited answer and groundedness/citation evidence.
+- Original K=3 parity (current eval proof uses FINAL_K=4).
+- Markdown/plain-text ingestion.
+- Real Axum/Next.js browser flow (UI remains mock-only at `http://127.0.0.1:3000`, HTTP 200).
+- Rust-only clean checkout after required parity passes.
+- Go removal remains deferred.
+
+No merge or auto-merge was performed. RAG CI remains absent; SOP repository CI is separate.
