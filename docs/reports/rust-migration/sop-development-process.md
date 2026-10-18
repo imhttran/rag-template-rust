@@ -7,9 +7,11 @@ values that cannot be established are marked UNKNOWN, and agent calls are never
 equated with user turns.
 
 - First recorded: 2026-10-17
-- Last updated: 2026-10-17 (hooks finished: read-only formatting checks, ST1012 fixed, both hooks pass; controlled failures block; external development work)
-- SOP: `sop` on PATH, `sop version` = `sop dev` (source HEAD `a46187b`,
-  `/home/tomtran/go/bin/sop`)
+- Last updated: 2026-10-18 (RUST-007 eval parity fixed via shared SQL retrieval; parity and affected suites PASS; pending gate untouched)
+- SOP: `sop` on PATH, `sop version` = `sop dev` (source base `c1db733` plus the
+  reviewed Cargo support and this session's agent-Cargo/gate changes;
+  `/home/tomtran/go/bin/sop`, SHA-256
+  `46bafeef0a0a04caa86a1a6f2755dc0e84d03b5cfb789e565415fbc027b9f470`)
 
 ## 1. Counts
 
@@ -796,3 +798,990 @@ Development outside SOP; SOP state and the active migration plan are unchanged.
     removed and the real repo untouched.
 - **Counts (this work)**: SOP invocations +0; SOP-internal agent calls +0; task
   attempts +0; approvals 0. External development work.
+
+## 21. SOP agent-Cargo authorization, verdict-gate enforcement, and storage re-verification
+
+Date: 2026-10-17. This section records the repair work done in the isolated SOP
+worktree and the first migration run after the repaired binary was installed. It
+does not rewrite any historical outcome.
+
+### 21.1 Source identity and worktree
+
+- Worktree: `~/agentic-workspace/agentic-sop-agent-cargo` (branch `sop-agent-cargo`).
+- Base: current `origin/main` at `c1db733e61a40516bda69dfc1f1d977cb0fcb481`
+  plus the previously reviewed Cargo acceptance-check patch.
+- Uncommitted by instruction; no commit, push, or merge.
+- Source changes:
+  - `internal/config/config.go` — `agent.tool_cargo` (default `false`).
+  - `internal/ollamaagent/{config,bridge,tools,harness}.go` — pass the option
+    explicitly into the tool harness; `NativeAgentFromEnvWithOptions` added and
+    `NativeAgentFromEnv` preserved as the default-off caller.
+  - `internal/cli/cli.go` — composition root reads the project setting and passes
+    it without mutating process-wide environment variables
+    (`nativeAgentForProject` / `agentToolCargo`).
+  - `internal/toolharness/harness.go` — `Config.AllowCargo` is classified through
+    the existing scoped `commandpolicy.Policy`.
+  - `internal/cli/run.go`, `internal/cli/drive.go` — the operator-enabled verdict
+    gate is now authoritative over local completion (see 21.3).
+  - Documentation: `docs/reference/LIFECYCLE-VERDICT-GATE.md`,
+    `docs/reference/CONFIGURATION.md`.
+  - New tests: `internal/ollamaagent/bridge_options_test.go`,
+    `internal/cli/agent_tool_cargo_test.go`,
+    `internal/toolharness/cargo_agent_tool_test.go`,
+    `internal/cli/verdict_gate_scheduling_test.go`.
+
+### 21.2 Agent-tool Cargo authorization
+
+- The setting is **separate** from `validation.acceptance_checks.cargo`: either can
+  be enabled without the other.
+- Default-off tests reject `cargo build/test/clippy/fmt --check`; opt-in tests allow
+  only the scoped shapes (`--locked`, `--all-targets`, `--manifest-path`, and
+  clippy's exact `-- -D warnings` suffix; `fmt` requires `--check`).
+- Rejected forms include `cargo run/install/publish/add/fix`, `+toolchain`, unknown
+  flags, `--target`, duplicate flags, missing/empty `--manifest-path`, post-`--`
+  arguments, and plain `cargo fmt`.
+- Containment is proven for both `--manifest-path VALUE` and
+  `--manifest-path=VALUE`, for absolute, parent-traversal, whitespace-prefixed, and
+  symlink-resolved escapes; rejected commands are proven never to execute (marker
+  file), and a real nested-crate `cargo test` executes through the harness.
+- Project propagation: `agent.tool_cargo: true` reaches the constructed native
+  agent; absent/false/unreadable configuration fails closed; two directories do not
+  inherit each other's permission.
+- Verified commands: `go build ./...`, `go vet ./...`, `gofmt -l` clean;
+  `go test ./internal/{toolharness,commandpolicy,ollamaagent,config}` PASS; focused
+  `internal/cli` policy/flow tests PASS; installed-binary smoke PASS (see 21.4).
+
+### 21.3 Verdict gate: failed acceptance now blocks advancement
+
+The two-task disposable proof exposed a real gap: the gate recorded
+`lifecycle: NEEDS_HUMAN` / `waiver_denied`, then still completed the task as
+`LOCAL_DONE` and ran its dependent. The completion path was repaired:
+
+- `emitRunSummary` returns a non-pass outcome when the gate resolves `NEEDS_HUMAN`.
+- `runScheduledTask` parks the run at the existing `WAITING_FOR_HUMAN` stage,
+  records the existing human-approval request, and requeues through the existing
+  bounded retry path instead of calling `completeTask`.
+- The scheduler therefore returns without entering the dependent task.
+- Flag-off behavior is unchanged (the branch is unreachable).
+
+Proof (`verdict_gate_scheduling_test.go`, persisted state, not console labels):
+
+- VG-001 with a failing required check → outcome `PARTIAL`, lifecycle
+  `NEEDS_HUMAN`, VG-001 **not** `LOCAL_DONE`, VG-002 `PLANNED`, and no VG-002 run
+  directory.
+- VG-001 with a passing required check → both tasks `LOCAL_DONE` with run evidence.
+
+### 21.4 Local installation of the verified candidate
+
+- Candidate: `/tmp/sop-candidate-20261017T1929Z`, SHA-256
+  `46bafeef0a0a04caa86a1a6f2755dc0e84d03b5cfb789e565415fbc027b9f470`.
+- Installed atomically to `~/go/bin/sop`; installed checksum matches the candidate.
+- Backup (the binary that was installed before this step):
+  `~/go/bin/sop.pre-agent-cargo-20261017T1929Z`, SHA-256
+  `6bdf8e9a44b481e2543617ef6293d8d36a2144aad1a0894c3622b10ad969a772`.
+- Rollback: `cp ~/go/bin/sop.pre-agent-cargo-20261017T1929Z ~/go/bin/sop`.
+- Installed-binary smoke against a scripted local Ollama `/api/chat`:
+  - `agent.tool_cargo: true` → the requested `cargo test --manifest-path
+    rust/Cargo.toml` executed (marker written).
+  - Same project without the setting → the command was denied before execution
+    (no marker; the denial appears in the tool transcript).
+  - Separate project directories did not inherit the permission.
+- The fake server was stopped; no test processes were left running.
+
+### 21.5 Plan repair and storage verification
+
+- Plan repair: added **RUST-005D — Verify storage client and Go/Rust
+  interoperability** (verify-first, depends on RUST-005A + RUST-005C, same two-way
+  interop criterion, whole-suite acceptance check). RUST-005B now depends on
+  RUST-005D as well as RUST-005C/RUST-003, so downstream work cannot advance before
+  storage verification.
+- `sop reconcile PLAN --list-changed --json` showed unchanged RUST-001–004,
+  RUST-005A/C, RUST-006–008; **updated RUST-005B; added RUST-005D; no changed
+  executed task**. `sop reconcile PLAN` applied it. Historical outcomes were not
+  rewritten.
+- First run after reconcile stopped at the explicit plan-change gate (no work
+  executed); this is a supported boundary, not a failure. After reconcile:
+  - `sop run PLAN --max-tasks 1` → **RUST-005D `VERIFIED` / `LOCAL_DONE`**,
+    `agent calls 0`, `validation runs 1`, 42.6 s. Verify-first avoided model calls.
+  - The acceptance check ran the whole Rust suite: `storage_interop` 3/3 passed
+    (Rust round-trip, Rust reads Go-written row, Go reads Rust-written row), plus
+    85 lib tests, 3 caller tests, 10 integration, 5 parity, 1 doc test. Direct
+    reproduction with the root `.env` loaded: exit 0.
+- Database evidence is recorded separately from the historical RUST-005C
+  `LOCAL_DONE`/`PARTIAL` verdict, which is preserved.
+
+### 21.6 Counts (artifact-backed where available)
+
+| Count | Value | Evidence / limitation |
+| ----- | ----- | --------------------- |
+| User turns | **UNKNOWN total**; 7 previously enumerated + this session's continuation instruction | The compacted interval's turns are not individually recoverable from artifacts. |
+| Manual continuations | **4 recorded** (3 previous + this session's checkpoint continuation) | Instruction-level count; compacted interval UNKNOWN. |
+| SOP invocations | **6 recorded** (4 previous + 2 this session) | This session: one plan-change stop, one RUST-005D run. Launches during the compacted interval are **UNKNOWN** (run artifacts show the attempts but not the launch count). |
+| SOP-internal agent calls | **17 across the latest run artifacts** (RUST-001:2, RUST-002:3, RUST-003:2, RUST-004:2, RUST-005:2, RUST-005A:2, RUST-005B:2, RUST-005C:2, RUST-005D:0) | Earlier attempts overwritten by later run metrics are **UNKNOWN**. Not equated with user turns. |
+| External development-agent calls | **UNKNOWN** | Not instrumented by SOP. |
+| Task attempts | RUST-001–004: 1 each; RUST-005: 1; RUST-005A: 1; RUST-005B: 1 (requeued); RUST-005C: 4 continuations (attempt count beyond the budget **UNKNOWN**); RUST-005D: 1 | From run artifacts/`sop status --detailed`. |
+| Approval requests | **0** | `sop approvals --json` empty. |
+| Plan repairs | **6 recorded** (P1–P4 previous, P5 RUST-005D + RUST-005B dependency, P6 verdict-gate completion-path enforcement) | P3 is now resolved by the Cargo acceptance support; P6 is a code repair required for the gate to be effective. |
+
+### 21.7 Remaining gaps and blockers
+
+- **Full `internal/cli` suite timeout (baseline, unresolved):** one 12-minute run
+  timed out with a goroutine stack blocked in
+  `modernc.org/sqlite` `_unixSync` during `store.Open` → `migrateHandoffs` from
+  `initProject` in `TestGraphRunPreExecutionRunsAfterTriageBeforeImplementation`.
+  Log: `/tmp/sop-cli-full.log`. Not reproduced further; not caused by this patch.
+- **Windows runtime unverified** (symlink and POSIX-shell tests are explicitly
+  skipped, not silently passed).
+- **Node.js acceptance checks remain outside SOP policy**; UI verification stays
+  operator-run evidence.
+- RUST-001–004 remain historical `LOCAL_DONE`/`PARTIAL`; no verify-first follow-up
+  has been created for them yet.
+- No commit, push, or merge.
+
+## 22. Migration continuation after storage verification, and the RUST-007 gate
+
+Date: 2026-10-17. One `sop run` invocation resumed the active plan after
+RUST-005D. It advanced RUST-005B and RUST-006, then stopped at RUST-007's
+human-approval boundary. No state was reset and no approval was granted.
+
+### 22.1 Run results
+
+| Task | SOP verdict | Lifecycle | Agent calls | Validation | Wall time |
+| ---- | ----------- | --------- | ----------- | ---------- | --------- |
+| RUST-005B | `VERIFIED` | `LOCAL_DONE` | 2 | 1 run, PASS | 5m 47s |
+| RUST-006 | `VERIFIED` | `LOCAL_DONE` | 2 | 1 run, PASS | 3m 28s |
+| RUST-007 | — | stopped at `WAITING_FOR_HUMAN` | 2 | not completed | 4m 10s |
+
+- Direct full Rust suite after the run: exit 0 — 104 lib, 4 pipeline, 3 caller,
+  10 Ollama contract, 5 parity, 3 storage interop, 1 doc test.
+- RUST-005B added `fingerprint.rs`, `transaction.rs`, `pipeline.rs`, the
+  `PgStore` source replacer, and `tests/ingest_pipeline.rs`; RUST-006 added the
+  `retrieval/` and `answer/` modules with unit tests.
+
+### 22.2 Verification gap that must not be hidden by `VERIFIED`
+
+Both outcome artifacts mark every substantive free-text criterion `Met: false`
+(informational) and only the whole-suite `check-1` required. The gate therefore
+reports `VERIFIED` from the suite alone. Inspection shows the criteria are not
+all met:
+
+- **RUST-005B:** `rust/src/bin/ingest.rs` is still a configuration-only stub; it
+  does not construct `IngestPipeline` or call `gate_pdf`. The "caller-level" test
+  (`tests/ingest_caller_rejects_incomplete_pdf.rs`) defines a local helper that
+  mimics a caller rather than driving the production binary. The guard is proven
+  at the library/fake level, not in the production ingest path.
+- **RUST-006:** the task's own implementation summary says wiring into `lib.rs`,
+  the `ask` binary, the service composition module, and the ingest→answer test is
+  "not yet complete and remain to be finished by the next invocation." The
+  free-text criteria (live end-to-end path, shared retrieval for answering and
+  evaluation, citation behavior) are marked unmet/informational.
+
+This is the same failure mode the operator warned about: a passing general Cargo
+suite is not evidence for missing database, API, UI, or production-caller
+behavior. The historical SOP verdicts are preserved, but these tasks must not be
+treated as accepted completion until the production wiring and the missing
+end-to-end evidence exist.
+
+### 22.3 RUST-007 approval boundary (not crossed)
+
+`sop approvals --json` records one `PENDING` `NEEDS_HUMAN` request for RUST-007:
+
+- The required validation list still contains Go commands (`go build ./...`,
+  `go test ./...`, `go vet ./...`, `gofmt`), which cannot pass after the final
+  Rust-only criteria remove Go source and `go.mod`.
+- RUST-007 is too large for one invocation: it combines porting the remaining
+  commands/evaluation, freezing parity evidence, rewriting docs/Makefile/hooks/CI,
+  moving Rust to the root, removing Go, and verifying a clean checkout.
+- SOP requeued RUST-007 to `PLANNED` (attempts: 1) and parked the run at
+  `WAITING_FOR_HUMAN`. It was not approved or declined.
+
+A supported repair (not applied, because the approval is a human decision) is:
+
+1. Split RUST-007 into bounded stages: (A) port the remaining Rust
+   commands/evaluation and wire the real ingest/answer caller; (B) freeze parity
+   evidence and update docs/Makefile/hooks/CI while Go is present; (C) move Rust
+   to the root, remove Go, replace the Go validation commands, and verify a clean
+   checkout without Go. RUST-008 depends on the last stage.
+2. Add bounded follow-ups for the RUST-005B production-caller wiring and the
+   RUST-006 service/bin/end-to-end wiring, with explicit evidence; preserve the
+   historical task records.
+3. Resolve the pending RUST-007 approval with `sop approve` or `sop decline`
+   (operator decision), then reconcile the revised plan and rerun.
+
+### 22.4 Counts (this run)
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | **+1** (total **7 recorded**; compacted interval remains UNKNOWN) |
+| SOP-internal agent calls | **+6** (total **23 across latest artifacts**) |
+| Task attempts | RUST-005B +1 (after its earlier requeue), RUST-006 +1, RUST-007 +1 (blocked) |
+| Approval requests | **1 pending** (RUST-007 `NEEDS_HUMAN`) |
+| Plan repairs | **0** in this run |
+
+### 22.5 State and remaining blockers
+
+- SOP plan `plan-rust-migration` is **ACTIVE**; RUST-001–006 are `LOCAL_DONE`
+  (RUST-001–005C historical `PARTIAL`; RUST-005D `VERIFIED`; RUST-005B/006
+  `VERIFIED` with the caveats above). RUST-007 is `PLANNED` at a pending human
+  gate; RUST-008 is `PLANNED`.
+- No SOP process is running. No commit, push, or merge.
+- Remaining: RUST-007 approval and split, RUST-005B/006 production wiring and
+  criterion evidence, Rust-only layout, Axum/Next.js integration, browser
+  end-to-end verification, Node.js operator-run checks, the full `internal/cli`
+  SQLite timeout, and Windows runtime verification.
+- The mock Next.js prototype still answers `http://127.0.0.1:3000` with HTTP 200;
+  it is **mock-only** and is not evidence of the real Rust pipeline or RUST-008.
+
+## 23. Concrete migration repair prepared for RUST-007 approval
+
+Date: 2026-10-17. No SOP run was active. The pending RUST-007 gate was read, not
+decided. The revised plan was compiled and reconciled only in `--list-changed`
+mode; the plan update was **not applied** to SOP state.
+
+### 23.1 Pending gate (unchanged)
+
+- `sop approval RUST-007`: `PENDING`, kind `NEEDS_HUMAN`, stage
+  `WAITING_FOR_HUMAN`, task status `PLANNED`.
+- SOP's supported resolution commands: `sop approve RUST-007`,
+  `sop decline RUST-007`, then `sop run`.
+- The reason is the Go-validation/Rust-only conflict plus the oversized scope.
+  Neither command was run.
+
+### 23.2 Plan repair
+
+Added bounded follow-ups (historical outcomes preserved):
+
+| Task | Purpose | Depends on |
+| ---- | ------- | ---------- |
+| RUST-005E | Production ingestion CLI/service wiring through `IngestPipeline`/`gate_pdf` | RUST-005B, RUST-005D |
+| RUST-006B | Retrieval and cited-answer CLI/service wiring | RUST-006, RUST-005E |
+| RUST-006C | Real ingest → retrieval → cited-answer verification | RUST-005E, RUST-006B |
+
+RUST-007 keeps its ID and historical execution record but is now the bounded
+evaluation/command-parity stage. Its former transition scope moved to:
+
+| Task | Purpose | Depends on |
+| ---- | ------- | ---------- |
+| RUST-007B | Freeze parity/capability/rollback/provenance evidence and pre-removal docs/CI/Makefile/hooks; clean checkout with Go present | RUST-007 |
+| RUST-007C | Rust-only layout: root crate, remove Go/tooling, Rust-only validation/docs/CI, clean checkout with Go absent | RUST-007B |
+
+RUST-008 now depends on RUST-007C. It remains mock-only until the real API and
+pipeline pass; Node/browser checks remain operator-run evidence.
+
+### 23.3 Criterion-to-evidence mapping and the informational-criteria limitation
+
+- SOP treats each `Acceptance Checks` command as **required** and each free-text
+  `Acceptance` line as **informational** whenever checks exist. Informational
+  criteria do not affect `VERIFIED`; this is why the whole-suite checks allowed
+  RUST-005B/RUST-006 to reach `VERIFIED` with production wiring missing.
+- The plan now maps the new required criteria to dedicated acceptance crates:
+  `rust/acceptance/ingest_cli`, `retrieval_cli`, `e2e`, `eval_parity`, `evidence`,
+  `clean_checkout_go`; and after the move, `acceptance/final_layout`,
+  `acceptance/clean_checkout`, `acceptance/api_contract`.
+- The whole-suite `cargo test` remains supplementary. It is never the sole
+  evidence for a production path, database behavior, API contract, or UI state.
+- Clean-checkout criteria use dedicated crates that copy the working tree and run
+  the configured checks with a sanitized PATH (Go present for RUST-007B; Go absent
+  for RUST-007C), rather than asserting from a developer shell.
+- Node.js/browser criteria remain outside the command policy; they are recorded
+  separately and cannot produce a SOP `VERIFIED` verdict.
+
+### 23.4 Transition vs final checks
+
+- While Go exists (RUST-001–007B), the Go reference checks remain required.
+- After Go removal (RUST-007C), only root Rust checks are required.
+- `.agent-sdlc/config.yaml` now uses transition-aware validation: Go checks run
+  only when `go.mod` exists; Rust checks follow `rust/Cargo.toml` during the
+  transition and `Cargo.toml` at the root afterwards.
+- `sop validate` with the revised config: **PASS** (both Go and Rust phases).
+- `cargo fmt` was applied to the agent's uncommitted Rust files to remove
+  formatting drift introduced by RUST-005B/006; no semantic change.
+
+### 23.5 Validation and reconciliation inspection (not applied)
+
+`sop reconcile docs/plans/PLAN-RUST-MIGRATION.md --list-changed --json`:
+
+- unchanged: RUST-001–004, RUST-005A–D, RUST-005B, RUST-006
+- updated: RUST-008 (dependency now RUST-007C)
+- added: RUST-005E, RUST-006B, RUST-006C, RUST-007B, RUST-007C
+- changed executed: RUST-007 (definition changed; history retained)
+- removed/removed executed: none
+
+The plan compiles. Applying the update requires the supported operator-authorized
+command:
+
+`sop reconcile docs/plans/PLAN-RUST-MIGRATION.md --accept-changed RUST-007`
+
+This records the changed executed definition without deleting history, resets no
+budget, and does not edit `state.db` directly.
+
+### 23.6 Exact proposed gate action and effects
+
+After reviewing and applying the repair, the proposed gate action is:
+
+`sop approve RUST-007`
+
+- Records the operator's approval on the pending `NEEDS_HUMAN` gate.
+- RUST-007 is `PLANNED` (runnable), so the approval records authorization as
+  provenance and does not spend a retry or requeue a blocked task.
+- It does not implement anything by itself; the next `sop run` executes the
+  revised bounded task graph.
+
+Alternative, if the repaired plan should replace the gate without authorizing the
+old boundary: `sop decline RUST-007` records a negative decision; it does not
+authorize execution. The task remains without an approved boundary and will not
+be treated as complete.
+
+### 23.7 Installed-binary provenance
+
+- Previously recorded installed binary: `1178a54c168883c801a30092bebf9fec3ca8903d6fb14248cee0541df18596af`
+  (the reviewed Cargo acceptance candidate). Its pre-install backup
+  `~/go/bin/sop.pre-cargo-support-20261017T183800Z` has SHA-256
+  `ed6dc1519c221ab1f0e8df1748bd4adbdf08c6eb94dbd9e09013f8ffd33353ef`.
+- At the start of this repair session, the installed binary on disk was **not**
+  `1178a54c`; it was
+  `6bdf8e9a44b481e2543617ef6293d8d36a2144aad1a0894c3622b10ad969a772`
+  (mtime 19:05). It did not contain the `agent.tool_cargo` setting
+  (`strings … | grep -c tool_cargo` = 0). Its exact build source/commit is
+  **UNKNOWN**: it is an intermediate SOP worktree build (base + Cargo acceptance
+  patch, before the agent-Cargo plumbing) or a rebuilt candidate from the
+  compacted interval. No artifact identifies it.
+- We preserved that actual pre-install binary as
+  `~/go/bin/sop.pre-agent-cargo-20261017T1929Z`
+  (`6bdf8e9a…`), rather than overwriting it. This is why the new backup checksum
+  differs from the previously recorded installed checksum: the backup captures the
+  binary that was actually installed at install time, not the older `1178a54c`
+  artifact. The older backup (`ed6dc151…`) remains on disk.
+- The currently installed binary is
+  `46bafeef0a0a04caa86a1a6f2755dc0e84d03b5cfb789e565415fbc027b9f470`,
+  built from worktree base `c1db733e61a40516bda69dfc1f1d977cb0fcb481` plus the
+  reviewed Cargo patch and the agent-Cargo/gate changes.
+- Rollback: `cp ~/go/bin/sop.pre-agent-cargo-20261017T1929Z ~/go/bin/sop`.
+
+### 23.8 Counts (this repair)
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | 0 (no `sop run`) |
+| SOP-internal agent calls | 0 |
+| Task attempts | 0 |
+| Approval requests | 1 pending (RUST-007), unchanged |
+| Plan repairs | +1 (bounded follow-ups + RUST-007 split + criterion mapping) |
+| User turns / manual continuations | 1 this repair |
+
+No commit, push, or merge. The UI remains mock-only at
+`http://127.0.0.1:3000` (HTTP 200) and is not RUST-008 evidence.
+
+## 24. Authorized reconcile, gate approval, and revised-plan resume
+
+Date: 2026-10-17. The operator authorized the prepared repair and the RUST-007
+gate. Both were applied. The revised plan then ran RUST-005E twice; both attempts
+made zero repository changes, so the run stopped as a real no-progress blocker.
+No third unchanged attempt was made.
+
+### 24.1 Applied operations
+
+- `sop reconcile docs/plans/PLAN-RUST-MIGRATION.md --accept-changed RUST-007`
+  - accepted the changed executed definition of RUST-007; added RUST-005E,
+    RUST-006B, RUST-006C, RUST-007B, RUST-007C; updated RUST-008; no removals.
+  - Historical task records and budgets were preserved.
+- `sop approve RUST-007 --by operator`
+  - recorded `APPROVED`; decision action `ALREADY_RUNNABLE` (RUST-007 was
+    `PLANNED`), so no retry was spent and no blocked task was requeued.
+  - `sop approvals --json` is now empty.
+
+### 24.2 RUST-005E runs
+
+| Attempt | Result | Evidence |
+| ------- | ------ | -------- |
+| 1 | `FAIL` → `BLOCKED (NO_PROGRESS)` | 6 implementation turns; 6 tool calls, 5 allowed / 1 denied; 0 mutations; 0 changed files; 1 plan repair; validation NOT RUN. |
+| 2 (after `sop retry`) | `FAIL` → `BLOCKED (NO_PROGRESS)` | 17 iterations; 12 discovery inspections; 13 allowed / 2 denied; 0 mutations; 0 changed files; validation NOT RUN. |
+
+Both traces show read-only discovery (list/read/narrate) and no write, create,
+delete, or mutating command. The second attempt read `ingest.rs`, `pipeline.rs`,
+`ingest.rs`, `embedding.rs`, `config.rs`, `fingerprint.rs`, `transaction.rs`,
+`storage_pg.rs`, `lib.rs`, `ollama.rs`, `Cargo.toml`, `tests/ingest_pipeline.rs`,
+and `storage.rs`, then hit `termination=no_progress`.
+
+`rust/acceptance` was never created, so the required acceptance checks
+(`cargo test --locked --manifest-path rust/acceptance/ingest_cli/Cargo.toml` and
+the whole suite) were **NOT RUN**. The task has no outcome verdict; it is
+`BLOCKED`, attempts 1.
+
+### 24.3 Why the run stopped
+
+- This is a genuine implementation-progress blocker, not an approval boundary.
+  The model produced no repository mutation in two bounded attempts. SOP's
+  classification is `TERMINAL (NO_PROGRESS, HIGH)` under the balanced autonomy
+  policy.
+- Repeating the same task unchanged is explicitly not justified. The smallest
+  next step is to make the task materially narrower or provide a concrete
+  implementation seam, for example:
+  - split RUST-005E into (a) add a callable production `ingest_service` function
+    and the `rust/acceptance/ingest_cli` crate, then (b) wire `bin/ingest.rs`,
+    config, and the real adapters; or
+  - give the agent an explicit file-level change contract for the first stage.
+- No downstream task can run: RUST-006B/006C/007/007B/007C/008 all depend on
+  RUST-005E directly or transitively.
+
+### 24.4 Counts (this resume)
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | **+2** (total **9 recorded**; compacted interval UNKNOWN) |
+| SOP-internal agent calls | **+5** (3 first attempt + 2 retry; total **28 across latest artifacts**) |
+| Task attempts | RUST-005E: 2 actual invocations, recorded `attempts: 1` after the supported retry |
+| Approval requests | **1 resolved** (RUST-007 approved); 0 pending |
+| Plan repairs | 1 in the first attempt (planner correction); 0 in the retry |
+
+### 24.5 Current state
+
+- SOP plan `plan-rust-migration` is ACTIVE.
+- RUST-005E is `BLOCKED (NO_PROGRESS)`; RUST-006B/006C/007/007B/007C/008 remain
+  `PLANNED`; RUST-001–006 retain their historical states.
+- No SOP process is running. No commit, push, or merge.
+- The UI remains the mock-only prototype at `http://127.0.0.1:3000` (HTTP 200);
+  it is not real RUST-008 evidence.
+
+## 25. RUST-005E split, successful service seam, and RUST-005F blocker
+
+Date: 2026-10-17. The operator authorized the proposed split. RUST-005E was
+narrowed to the production service seam + acceptance crate, RUST-005F was added
+for binary/config/adapter wiring, and the dependent tasks were re-pointed.
+
+### 25.1 Plan repair applied
+
+- `sop reconcile PLAN --accept-changed RUST-005E --accept-changed RUST-006`
+  - narrowed RUST-005E; added RUST-005F; updated RUST-006B/006C dependencies and
+    the historical RUST-006 definition (heading correction).
+  - RUST-005E retains its ID and prior zero-mutation attempt history.
+- A duplicated RUST-006 heading introduced during the split was caught in
+  `sop status`, corrected in the plan, and reconciled again before any run.
+
+### 25.2 RUST-005E — VERIFIED
+
+- `sop run` → **RUST-005E `VERIFIED` / `LOCAL_DONE`**, 2 agent calls, 1 validation
+  run, 6m 14s.
+- Production seam: `rust/src/service.rs` (`IngestService`) delegates to
+  `IngestPipeline`, which calls `gate_pdf` before any effect.
+- Acceptance crate: `rust/acceptance/ingest_cli/tests/ingest_acceptance.rs` drives
+  `rag_foundation::service::IngestService` (production code), not a local helper;
+  it asserts mixed/scanned rejection, affected page `[2]`, zero embedding calls,
+  zero replacements/rows written, and untouched stored data.
+- This is meaningful evidence for the service seam; it is not evidence for the
+  binary/config/adapter wiring, which is RUST-005F.
+
+### 25.3 RUST-005F — blocked after multiple supported attempts
+
+RUST-005F (`Production ingest binary/config/adapter wiring`) did not produce any
+repository change:
+
+| Attempt | Outcome | Evidence |
+| ------- | ------- | -------- |
+| Split run | `CONTINUE` 1/4 | discovery budget closed before reading adapter signatures |
+| Continuation 2 | `RETRY` (transient) | `ollama returned an empty response` |
+| Continuation 3 | `CONTINUE` 2/4 | agent returned `needs_human` for missing constructor signatures |
+| Continuation 4 | `BLOCKED (NO_PROGRESS)` | 17 turns, 12 discovery inspections, 13 allowed / 2 denied, **0 mutations, 0 changed files**; it read `bin/ingest.rs`, `config.rs`, `service.rs`, `lib.rs`, `pipeline.rs`, `embedding.rs`, `storage_pg.rs`, `fingerprint.rs`, the acceptance crate, and `Cargo.toml`, then terminated `no_progress` |
+
+The agent repeatedly read the relevant modules but never wrote `bin/ingest.rs` or
+extended the acceptance crate. `rust/src/bin/ingest.rs` is still the
+configuration-only stub. Validation and the acceptance checks were **NOT RUN** for
+RUST-005F. This is a terminal no-progress blocker; no unchanged retry was made.
+
+### 25.4 State and counts (this phase)
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | +4 (total **13 recorded**; compacted interval UNKNOWN) |
+| SOP-internal agent calls | +10 (RUST-005E 2 + RUST-005F 8; total **38 across latest artifacts**) |
+| Task attempts | RUST-005E: 1 successful (recorded attempts 2 including the earlier blocked stage); RUST-005F: recorded attempts 1, continuations 2/4 |
+| Approval requests | 0 pending |
+| Plan repairs | +1 (RUST-005E split / RUST-005F addition) |
+
+- SOP state: RUST-005E `LOCAL_DONE`/`VERIFIED`; RUST-005F `BLOCKED`; RUST-006B/006C/
+  007/007B/007C/008 `PLANNED`; no SOP process running.
+- No commit, push, or merge.
+- UI remains the mock-only prototype at `http://127.0.0.1:3000` (HTTP 200), not
+  RUST-008 evidence.
+
+### 25.5 Smallest next step
+
+RUST-005F needs a materially narrower binary-level change contract (for example:
+"replace only `rust/src/bin/ingest.rs` with a call to `IngestService` using the
+already-read constructors; do not touch the acceptance crate yet"), followed by a
+separate acceptance-crate extension. Repeating the current RUST-005F unchanged is
+not justified.
+
+## 26. Updated SOP (fb49b2f), production ingest wiring, and RUST-006B gate
+
+Date: 2026-10-18. Resumed the migration with the updated SOP binary
+`fb49b2fdbd65676d31996900ccb8bcbbd865b7a9` (SHA-256
+`2746a6c8d23f1427dff059264cb76672b109744f671827a677c99670ed432d49`). No SOP
+installation or enhancement was performed.
+
+### 26.1 Compatibility and prerequisites
+
+- Config migrated from the legacy keys to the new independent form:
+  `cargo.agent_tool: true` and `cargo.acceptance_check: true`; legacy
+  `agent.tool_cargo` and `validation.acceptance_checks.cargo` removed.
+- `sop validate` with the transition-aware validation: **PASS** (Go reference
+  while `go.mod` exists; Rust build/test/fmt/clippy).
+- PostgreSQL `rag_migration_test` on `127.0.0.1:5432`: reachable; pgvector
+  **0.6.0**. Ollama: **healthy**; `deepseek-v4.1-flash:cloud` and
+  `nomic-embed-text:latest` present.
+- The verdict gate is active. It caught the RUST-006B missing required check and
+  stopped at `NEEDS_HUMAN` instead of advancing.
+
+### 26.2 Production ingest wiring
+
+- RUST-005F (`LOCAL_DONE`, historical **PARTIAL**) rewrote
+  `rust/src/bin/ingest.rs` to build real adapters from `Config` and call the
+  single `IngestService`/`IngestPipeline`; the acceptance checks passed, but the
+  updated SOP reported PARTIAL because the plan lacked a parsed acceptance
+  mapping.
+- Added `rust/tests/ingest_binary.rs`: it spawns the real `ingest` binary via
+  `CARGO_BIN_EXE_ingest`, seeds a row in the dedicated database, and verifies
+  mixed/scanned/missing inputs exit non-zero, report affected pages, and leave
+  the row untouched. It passes against PostgreSQL.
+- Fixed a real clippy `question_mark` finding in `bin/ingest.rs`; `cargo fmt`,
+  clippy, and the whole suite pass.
+
+### 26.3 New SOP acceptance mapping and verification tasks
+
+- The plan was converted from the legacy `###` task shape to the new SOP's
+  rendered `## <id> — <title>` shape so `### Acceptance Mapping` is actually
+  parsed. Reconciliation showed **no changed-executed tasks**; only
+  RUST-008/mapping metadata and the new tasks changed.
+- RUST-005G (legacy-shape verification) remained `LOCAL_DONE`/`PARTIAL`;
+  RUST-005H (mapped verification) ran verify-first with **0 agent calls** and
+  recorded **VERIFIED / LOCAL_DONE**.
+- RUST-006B/006C now depend on RUST-005H.
+
+### 26.4 RUST-006B gate (not crossed)
+
+`RUST-006B` implemented `rust/src/answer/service.rs` (a single `AnswerService`
+composing the shared retrieval module, context budgeting, answerability,
+prompting, generation, citation repair, and page rendering) and validation
+passed, but the required mapped check failed:
+
+`cargo test --locked --manifest-path rust/acceptance/retrieval_cli/Cargo.toml`
+→ **manifest path does not exist**.
+
+SOP recorded `PARTIAL` / `NEEDS_HUMAN`, parked at `WAITING_FOR_HUMAN`, and did
+not advance. `sop approvals --json` shows one pending gate: **RUST-006B**. It was
+not approved or declined. The missing acceptance crate is the concrete blocker;
+the smallest fix is to add `rust/acceptance/retrieval_cli` with tests that drive
+the production `AnswerService`, then re-verify through a mapped verification
+task (preserving RUST-006B's historical outcome).
+
+### 26.5 Counts (this phase)
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | +8 (total **21 recorded**; compacted interval UNKNOWN) |
+| SOP-internal agent calls | +12 (total **50 across latest artifacts**) |
+| Task attempts | RUST-005F 2; RUST-005G 5 invocations (continuation 4/4); RUST-005H 1; RUST-006B 1 (pending gate) |
+| Approval requests | **1 pending** (RUST-006B); RUST-007 previously resolved |
+| Plan repairs | +3 (rendered-plan conversion/mappings; RUST-005G; RUST-005H) |
+
+### 26.6 State
+
+- RUST-005E/F/G `LOCAL_DONE` (F/G historical PARTIAL), RUST-005H `VERIFIED`,
+  RUST-006B `PLANNED` at the pending gate, RUST-006C/007/007B/007C/008 `PLANNED`.
+- No SOP process is running. No commit, push, or merge.
+- The UI is still the mock-only prototype at `http://127.0.0.1:3000` (HTTP 200);
+  no real Axum/Next.js flow exists yet.
+
+## 27. RUST-006B repair — production answering and retrieval acceptance
+
+Date: 2026-10-18. Direct development work, outside SOP execution. The pending
+RUST-006B approval was not touched.
+
+### 27.1 What was missing
+
+RUST-006B's recorded implementation did not persist `answer/service.rs` or a
+production query binary, and the mapped acceptance crate
+`rust/acceptance/retrieval_cli` did not exist. The gate correctly failed the
+required check and parked at `NEEDS_HUMAN`.
+
+### 27.2 Implemented
+
+- `rust/src/answer/service.rs` — `AnswerService` composes the shared retrieval
+  `Candidate` type with context budgeting, answerability, prompt construction,
+  generation, citation repair, and page rendering. `AnswerError` distinguishes
+  retrieval from generation dependency failures.
+- `rust/src/answer/mod.rs`, `rust/src/lib.rs` — export the answer and retrieval
+  modules (they were previously not compiled as part of the library).
+- `rust/src/storage_pg.rs` — `rows_for_corpus` production read path.
+- `rust/src/bin/query.rs` + `[[bin]] query` — real production query entry point
+  using PostgreSQL rows, the shared vector/FTS/fusion/dedup/expand modules, the
+  Ollama embedder/generator, and `AnswerService`.
+- Fixed pre-existing compile errors hidden by the unexported modules
+  (`expand.rs` reference clone; test-only Clone/Sync issues in query-rewrite and
+  rerank stubs).
+- `rust/acceptance/retrieval_cli` — new acceptance crate with **5**
+  `AnswerService` tests and **4** real query-binary tests:
+  - cited source and page metadata;
+  - invalid citations dropped;
+  - insufficient evidence refuses without generation;
+  - retrieval and generation dependency failures reported;
+  - real binary answer with `source: <source>, page 2`;
+  - real binary refusal on an empty corpus;
+  - real binary database failure;
+  - real binary generation failure.
+  Test-owned rows are deleted in a `Drop` cleanup.
+
+### 27.3 Verification
+
+- `cargo test --locked --manifest-path rust/acceptance/retrieval_cli/Cargo.toml`
+  — **PASS**: 5 + 4 tests (with the real database and scripted Ollama server).
+- `cargo test --locked --manifest-path rust/Cargo.toml` — **PASS**: 154 lib +
+  1 binary + 3 caller + 4 pipeline + 10 contract + 5 parity + 3 interop + 1 doc.
+- `cargo fmt --check` and `cargo clippy … -D warnings` for both the main crate
+  and the acceptance crate — **PASS**.
+- `sop validate` — **PASS** (Go reference + Rust build/test/fmt/clippy).
+
+### 27.4 Gate state and counts
+
+- Pending approval: **RUST-006B `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**, untouched.
+- SOP invocations: **0**; SOP-internal agent calls: **0**; task attempts: **0**.
+- Plan repairs: **0**. Direct development only.
+- No commit, push, or merge.
+- Mock UI remains at `http://127.0.0.1:3000` (HTTP 200); no real browser flow
+  has been verified yet.
+
+## 28. RUST-006B verify-first completion and RUST-006C e2e repair
+
+Date: 2026-10-18. Direct repair work plus SOP execution. The RUST-006C gate was
+not approved or declined.
+
+### 28.1 RUST-006B completion
+
+The RUST-006B gate repeated because the agent could not re-run the configured
+validation forms under the agent-tool policy (shell conditionals, clippy `--`,
+and `cargo fmt --manifest-path`). The implementation and mapped checks already
+passed. RUST-006B was changed to `verify-first` (same acceptance criteria and
+mapping), reconciled with `--accept-changed`, the pending gate was approved, and
+the lifecycle ran the checks with **0 agent calls**:
+
+- `RUST-006B` → `VERIFIED` / `LOCAL_DONE`.
+- Evidence: `rust/acceptance/retrieval_cli` (5 AnswerService + 4 real query
+  binary tests) and the whole Rust suite.
+
+### 28.2 RUST-006C e2e repair
+
+The agent created `rust/acceptance/e2e` with a driver and a frozen baseline but
+no `Cargo.lock` and no tests; the fix loop exhausted on the missing lockfile.
+Direct repair:
+
+- Added `rust/acceptance/e2e/tests/e2e.rs`:
+  - real production ingest of `rust/fixtures/parity/inputs/text-layer.pdf`
+    through `IngestService` into PostgreSQL/pgvector;
+  - production retrieval + `AnswerService` with a **scripted** fixture embedder
+    and mocked generator;
+  - asserts the frozen local baseline: 2 chunks, top candidate
+    `rust/fixtures/parity/inputs/text-layer.pdf::Page 1::0`, cited answer,
+    page-1 reference;
+  - covers invalid, incomplete, empty, and oversized inputs with rejection and
+    stored-row preservation;
+  - asserts the report keeps `[deterministic]` and `[live-model]` sections
+    separate and that a scripted run is not presented as live-model evidence.
+- Generated `rust/acceptance/e2e/Cargo.lock` (required by `--locked`).
+- Moved `serde`/`serde_json` to the crate's runtime dependencies (the driver
+  uses them) and fixed the e2e unit-embedder clippy finding.
+- Switched the local e2e corpus to the existing frozen text-layer PDF because
+  the production ingest path is PDF-based. The local e2e baseline is a
+  deterministic regression record, not the frozen Go parity fixture; the Go
+  provenance fixtures are untouched.
+
+### 28.3 Verification
+
+- `cargo test --locked --manifest-path rust/acceptance/e2e/Cargo.toml` — **PASS**
+  (2 tests: real deterministic path + live-section separation).
+- `cargo test --locked --manifest-path rust/Cargo.toml` — **PASS** (154 lib +
+  binary/integration/doc tests).
+- `cargo fmt --check` and `cargo clippy -D warnings` for the e2e crate — **PASS**.
+- `sop validate` — **PASS**.
+- Live Ollama: **NOT RUN** for the e2e baseline. The deterministic section is
+  scripted-provider evidence; live observations remain opt-in via
+  `RAG_E2E_LIVE_OBSERVATIONS` and are reported separately.
+
+### 28.4 Gate and counts
+
+- Pending approval: **RUST-006C `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**, untouched.
+- RUST-006B: `LOCAL_DONE` / `VERIFIED`, 0 agent calls on the verify-first pass.
+- RUST-006C: `PLANNED`, attempts 1, fix cycles 3/3.
+- SOP invocations: +5 (26 recorded). SOP-internal agent calls: +14 (64 across
+  latest artifacts). Plan repairs: +1 (RUST-006B verify-first).
+- No commit, push, merge, `state.db` edit, or budget reset.
+- UI remains mock-only at `http://127.0.0.1:3000` (HTTP 200); no browser flow.
+
+## 29. RUST-006C verified, RUST-007 blocked, and explicit unmet requirements
+
+Date: 2026-10-18. RUST-006C was converted to verify-first and approved under the
+operator's authorization. RUST-007 then made zero repository changes and blocked
+at a new approval boundary. That new gate was not approved.
+
+### 29.1 RUST-006C
+
+- Converted to `verify-first` with all criteria and mappings preserved.
+- Reconciled with `--accept-changed RUST-006C`; the pending gate was approved
+  under the explicit authorization for this task.
+- **RUST-006C `LOCAL_DONE` / `VERIFIED`**, **0 agent calls**, validation PASS.
+- Evidence: `rust/acceptance/e2e` (2 tests) over the real text-layer PDF and
+  PostgreSQL/pgvector, with a fixture embedder and mocked generator.
+
+### 29.2 Evidence separation
+
+The plan now has a **Known unmet requirements** section and RUST-006C states its
+evidence scope explicitly:
+
+- **Scripted service-level e2e (satisfied):** production ingest/retrieval/answer
+  services over the real database with a fixture embedder and mocked generator.
+- **Live-model e2e (UNMET):** no real Ollama answer was run; live observations
+  remain opt-in and separate.
+- **Markdown/plain-text ingestion (UNMET):** the production ingestion path is
+  PDF-only; the e2e corpus is a PDF and does not satisfy text/Markdown loaders.
+- **CLI/browser e2e (UNMET):** RUST-006C does not drive the browser UI; the real
+  query binary is covered separately by RUST-006B acceptance tests.
+- **Go parity (separate):** the frozen Go fixtures/provenance remain the
+  reference; the local e2e baseline is a regression record, not new parity.
+
+None of these were removed, remapped, or weakened.
+
+### 29.3 RUST-007 result
+
+The bounded evaluation/command-parity task ran and inspected the Go eval and
+bilingual commands, `evals/`, the retrieval modules, and the Rust tree, then
+terminated `no_progress`:
+
+- 17 iterations, 12 discovery inspections, 13 allowed / 1 denied tool call,
+  **0 mutations, 0 changed files**, validation NOT RUN.
+- SOP classified it `NEEDS_HUMAN (APPROVAL_REQUIRED, HIGH)` and blocked it.
+- **RUST-007 is `BLOCKED`; a new gate is pending.** This gate was not approved
+  and the RUST-006C approval was not reused.
+
+### 29.4 Counts and state
+
+| Count | Value |
+| ----- | ----- |
+| SOP invocations | +1 (27 recorded) |
+| SOP-internal agent calls | +2 (66 across latest artifacts) |
+| Task attempts | RUST-006C final verify pass; RUST-007 attempt 1 (blocked) |
+| Approval requests | **1 pending — RUST-007** |
+| Plan repairs | +1 (RUST-006C verify-first + explicit unmet requirements) |
+
+- RUST-006B/C `LOCAL_DONE`/`VERIFIED`; RUST-007 `BLOCKED`; RUST-007B/C/008
+  `PLANNED`.
+- No commit, push, merge, `state.db` edit, or budget reset.
+- UI remains mock-only at `http://127.0.0.1:3000` (HTTP 200); no browser flow.
+
+## 30. RUST-007 repair proposal — eval narrowed, bilingual follow-up
+
+Date: 2026-10-18. Plan-only repair. The pending RUST-007 gate was not approved,
+no run was started, and no code or state was changed.
+
+### 30.1 RUST-007 failure analysis
+
+- Implementation provider/model: **ollama / deepseek-v4.1-flash:cloud**,
+  harness `tool`, no fallback.
+- Persisted trace: 14 tool calls (13 allowed, 1 denied), 12 discovery
+  inspections, **no `write_file`/`create_file`/mutating command**, 0 source
+  mutations; termination `no_progress` after narration.
+- The sanitized trace does **not** persist the denied call's name/arguments; it
+  lists only the allowed calls. The exact denied call is **UNKNOWN**.
+- Because the model never attempted a write in the visible trace and spent the
+  budget reading/listing/narrating, the primary cause is **implementation
+  behavior** (discovery/narration loop), not a demonstrated authorization gap.
+  The one denied call cannot be classified from the artifacts; it did not block a
+  visible write attempt.
+- `changed_files.json` lists `rust/target/debug/ingest` and `smoke` build
+  artifacts, not source changes; the run made no source mutation.
+
+### 30.2 Proposed narrowing (not applied to SOP state)
+
+- **RUST-007** (ID/history retained) now covers exactly one production command:
+  `eval`.
+  - Files: `rust/src/bin/eval.rs`, `rust/src/evaluation.rs`, `[[bin]] eval` in
+    `rust/Cargo.toml`, `rust/acceptance/eval_parity/{Cargo.toml,src/lib.rs,tests/eval_parity.rs}`,
+    and an invocation-mapping report.
+  - Inputs: `evals/retrieval.json` (default; `EVAL_DATASET` override), the
+    ingested PostgreSQL corpus, and the fixed configuration
+    `QUERY_REWRITE=false`, `EVAL_LEXICAL_RERANK=false`, `EVAL_LLM_RERANK=false`,
+    `EVAL_ANSWERABILITY_GATE=false`, `EVAL_FACT_JUDGE=false`, `TOP_K=4`,
+    `FINAL_K=3`, `EXPAND_LIMIT=20`.
+  - Outputs: per-case top-K source/section ordering and aggregate vector/hybrid
+    recall/precision and evidence recall, compared with the pinned Go `cmd/eval`.
+  - The acceptance crate is created **with** the production command; a stub or
+    fixture-only command must fail it. No passing crate is pre-created.
+- **RUST-007D** is the single bilingual follow-up: `expbilingual` arms
+  A/B/C/D1/D2/E, `evals/retrieval-vi-en-expanded.json`, `ARM`, `REPEATS`, `DIAG`,
+  `QUERY_CACHE`, `GEN_TIMEOUT`, pinned generation (temperature 0, seed 0,
+  num_predict 64), cache semantics, and the four-command mapping closure.
+  - Its live-model groundedness/citation criterion is explicitly **manual/UNMET**
+    until a real Ollama run is recorded.
+- **RUST-007B** now depends on both RUST-007 and RUST-007D.
+
+### 30.3 Reconcile delta (validated, not applied)
+
+`sop reconcile docs/plans/PLAN-RUST-MIGRATION.md --list-changed --json`:
+
+- added: **RUST-007D**
+- updated: **RUST-007B**
+- changed executed: **RUST-007**
+- removed / removed executed: none
+
+The plan compiles. No code, dependency, or acceptance-crate file was created.
+
+### 30.4 Closure requirements
+
+The plan's **Known unmet requirements** section now states that these must be
+resolved before final project completion/cleanup:
+
+- Markdown/plain-text ingestion through the production path (still PDF-only).
+- Live-model end-to-end verification (RUST-007D criterion 4 is manual/UNMET).
+- Combined CLI/browser end-to-end (RUST-008 must replace mock-only).
+- Go parity remains the frozen reference; the local e2e baseline is not parity.
+
+### 30.5 Checks and counts
+
+- Only the plan compiler was run (`sop reconcile --list-changed`); no full suite
+  was rerun. Unchanged RUST-005H/006B/006C evidence is reused.
+- SOP invocations: **0**; SOP-internal agent calls: **0**; task attempts: **0**.
+- Pending approval: **1 — RUST-007** (untouched).
+- Plan repairs: +1. No commit, push, merge, `state.db` edit, or budget reset.
+
+## 31. RUST-007 narrowed eval run — real parity mismatch
+
+Date: 2026-10-18. The prepared reconciliation and gate approval were applied, and
+the narrowed eval task ran once with `--max-tasks 1`. It implemented the
+production command but did not create the parity crate, so the gate re-opened.
+I prepared the parity crate; it exposes a real Go/Rust mismatch. No further run
+or gate approval was made.
+
+### 31.1 Run evidence
+
+- Provider/model: **ollama / deepseek-v4.1-flash:cloud**, harness `tool`.
+- The agent added `rust/src/bin/eval.rs` and `rust/src/evaluation.rs`; validation
+  passed. It did not add `rust/acceptance/eval_parity`, so the mapped check
+  failed with "manifest path does not exist"; SOP re-opened `NEEDS_HUMAN`.
+- RUST-007 is `PLANNED`, attempts 2, with a pending gate.
+
+### 31.2 Parity crate prepared
+
+- Added `rust/acceptance/eval_parity` with a real behavior test:
+  - builds/runs Go `cmd/ingest` and `cmd/eval`;
+  - builds/runs the production Rust `eval`;
+  - both use the same PostgreSQL corpus, `evals/retrieval.json`, fixed config
+    (`QUERY_REWRITE=false`, rerank/answerability/fact-judge off, `TOP_K=4`,
+    `FINAL_K=4`, `EXPAND_LIMIT=20`, `MIN_SIMILARITY=0.6`), and the same
+    deterministic `/api/embed` vectors derived from the input text;
+  - compares per-case hybrid recall/precision at the common emitted K=4 and the
+    aggregate metrics, with an absolute tolerance of **0.005** (two-decimal
+    output rounding); case count, question order, and rejection labels are exact;
+  - cleans only the test-owned corpus rows.
+- The temporary leftover `interop://rust/...` test row was removed so the
+  unfiltered Go eval and corpus-filtered Rust eval see the same rows.
+
+### 31.3 Exact failure
+
+`cargo test --locked --manifest-path rust/acceptance/eval_parity/Cargo.toml`:
+
+```text
+case 0 (How long is the grace period?) recall:
+Go=0.0000 Rust=0.5000 differs by more than the documented tolerance 0.005
+```
+
+Go's case-0 hybrid top-4 were from `examples/commercial-servicing-manual.md`
+while the expected evidence is in `examples/loan-policy.md` /
+`examples/large-loan-policy.md`; the Rust eval returned recall 0.5. The likely
+cause is the retrieval-path difference: the Rust eval composes the in-memory
+vector/FTS/fusion modules over rows, while Go `cmd/eval` uses its SQL vector and
+full-text retrieval. This is a real parity gap, not a test fixture issue; the
+test was not weakened.
+
+### 31.4 State and counts
+
+- Pending approval: **RUST-007 `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**, untouched.
+- SOP invocations: +1 (28 recorded); SOP agent calls: +2 (68 across latest
+  artifacts); RUST-007 attempts: 2.
+- Plan repair applied this turn: the previously prepared RUST-007 narrowing.
+- No commit, push, merge, `state.db` edit, or budget reset.
+- Markdown/text ingestion, live-model E2E, and combined CLI/browser E2E remain
+  explicit unmet closure requirements.
+- UI remains mock-only at `http://127.0.0.1:3000` (HTTP 200).
+
+### 31.5 Smallest next step
+
+Fix the production Rust eval retrieval to match Go's SQL vector/FTS/fusion path
+(or establish a documented, evidence-backed reason for a permitted numerical
+difference), then rerun the parity crate. Do not approve the RUST-007 gate or
+claim VERIFIED while the parity test fails.
+
+## 32. RUST-007 eval parity repair — SQL retrieval path
+
+Date: 2026-10-18. Direct repair under the existing migration scope. The RUST-007
+gate remains pending and was not approved.
+
+### 32.1 Stage-by-stage case-0 comparison
+
+- **Corpus rows/filters:** both commands saw the same test-owned rows. Go
+  `cmd/eval` does not filter by corpus; the Rust eval filters by `RAG_CORPUS`.
+  The parity test now requires an isolated database and fails closed if any
+  foreign corpus exists; it does not delete foreign rows.
+- **Query embeddings:** both used the same deterministic `/api/embed` server and
+  identical question text, so the query vectors were identical.
+- **Vector scores/threshold:** Go uses `1 - (embedding <=> query)` in SQL;
+  Rust used in-memory cosine. The agreed `MIN_SIMILARITY=0.6` applied to both.
+- **Full-text tokenization/ranking:** this was the first substantive divergence.
+  Go uses PostgreSQL `to_tsvector` + `websearch_to_tsquery` + `ts_rank` with the
+  language configuration. Rust used its simple in-memory tokenizer/term count.
+- **Fusion/tie-breaking:** Go uses RRF k=60, ordered by fused score, best rank,
+  then database row id. Rust used the in-memory fusion (string id tie-break),
+  then deduplication and expansion before truncation.
+- **Evidence matching/metrics:** Go `cmd/eval` scores the raw fused ranking at
+  each K. The Rust eval applied dedup/expansion before truncating, which changed
+  the case-0 ranking even when the underlying hits were close.
+
+### 32.2 Correction (shared production path)
+
+- `rust/src/storage_pg.rs`: added SQL `vector_search` (pgvector cosine) and
+  `keyword_search` (PostgreSQL FTS with the Go language-config mapping), binding
+  literals as `text` and casting to `vector`/`regconfig` for the Rust driver.
+- `rust/src/retrieval_pg.rs`: added shared RRF fusion with Go's exact ordering
+  (score, best rank, database row id).
+- `rust/src/evaluation.rs`: added `evaluate_sql`, using the SQL vector/FTS path
+  and raw fused ranking at `FINAL_K`, matching Go `cmd/eval`.
+- `rust/src/bin/eval.rs`: uses `evaluate_sql`.
+- `rust/src/bin/query.rs`: the production query path now uses the same SQL
+  vector/FTS retrieval and shared fusion, then the existing dedup/expansion.
+- No eval-only workaround and no expected-result change: the Go reference was
+  not modified.
+
+### 32.3 Results
+
+- `cargo test --locked --manifest-path rust/acceptance/eval_parity/Cargo.toml`
+  — **PASS** (43-case Go/Rust comparison, tolerance 0.005).
+- `cargo test --locked --manifest-path rust/Cargo.toml` — **PASS** (169 lib
+  tests plus integration/doc tests).
+- `cargo test --locked --manifest-path rust/acceptance/retrieval_cli/Cargo.toml`
+  — **PASS** (5 AnswerService + 4 real query-binary tests) after the query-path
+  change.
+- `cargo fmt --check` / `cargo clippy -D warnings` for main and eval-parity
+  crates — **PASS**.
+- `sop validate` — **PASS**.
+
+### 32.4 Configuration and remaining gaps
+
+- `FINAL_K=4` is the documented common-metric comparison because Go emits
+  `K=1,2,TOP_K` and does not emit K=3. It **does not** prove the original
+  `FINAL_K=3` behavior.
+- The Go eval has no corpus filter. The parity test now requires an isolated
+  database and fails closed if any foreign corpus is present; it does not delete
+  rows by source prefix. (One pre-existing `interop://rust/...` test row was
+  removed during diagnosis before this guard existed; the test cleanup itself
+  uses only its unique run corpus.)
+- Markdown/text ingestion, live-model E2E, and combined CLI/browser E2E remain
+  explicit unmet closure requirements.
+- Pending approval: **RUST-007 `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**.
+- No commit, push, merge, `state.db` edit, or budget reset.
