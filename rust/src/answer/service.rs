@@ -74,6 +74,7 @@ pub struct AnswerService<'a, R, G> {
     retrieval: &'a R,
     generator: &'a G,
     budget: usize,
+    citation_validation: bool,
 }
 
 impl<'a, R, G> AnswerService<'a, R, G>
@@ -88,7 +89,20 @@ where
             retrieval,
             generator,
             budget,
+            citation_validation: true,
         }
+    }
+
+    /// Enables or disables Go-compatible citation validation.
+    ///
+    /// Validation is enabled by [`AnswerService::new`]. When enabled, an answer
+    /// with a missing or invalid citation takes the single bounded repair
+    /// re-prompt and any residual invalid citation is stripped. When disabled,
+    /// the raw model answer is returned unchanged, matching the Go baseline's
+    /// default (`RAG_CITATION_VALIDATION=false`).
+    pub fn with_citation_validation(mut self, enabled: bool) -> Self {
+        self.citation_validation = enabled;
+        self
     }
 
     /// Answers `question` with cited evidence, or returns the baseline refusal.
@@ -114,13 +128,43 @@ where
 
         let prompt_text = prompt::build(question, &passages);
         let raw = self.generator.generate(&prompt_text)?;
-        let repaired = citation::repair(&raw, &passages);
-        let references = self.references(&repaired, &passages);
+        let final_text = if self.citation_validation {
+            self.validate_and_repair(question, &raw, &passages)
+        } else {
+            raw
+        };
+        let references = self.references(&final_text, &passages);
         Ok(Answer {
-            text: repaired,
+            text: final_text,
             references,
             refused: false,
         })
+    }
+
+    /// Applies the Go baseline's citation policy: an answer is clean only when
+    /// it makes at least one citation and every citation resolves. Otherwise
+    /// one repair re-prompt is issued; if it fails or returns nothing usable,
+    /// the original answer is stripped instead so the caller still gets a
+    /// usable answer. Residual invalid citations are always stripped, so an
+    /// invalid citation is never returned as if valid.
+    ///
+    /// The initial generation error is returned to the caller by [`Self::answer`].
+    /// A repair-call error is deliberately non-fatal, matching the Go baseline.
+    fn validate_and_repair(
+        &self,
+        question: &str,
+        raw: &str,
+        passages: &[ContextPassage],
+    ) -> String {
+        if citation::is_clean(raw, passages) {
+            return raw.to_string();
+        }
+
+        let repair_prompt = prompt::repair_build(question, passages, raw);
+        match self.generator.generate(&repair_prompt) {
+            Ok(repaired) if !repaired.trim().is_empty() => citation::repair(&repaired, passages),
+            Ok(_) | Err(_) => citation::repair(raw, passages),
+        }
     }
 
     fn references(&self, answer: &str, passages: &[ContextPassage]) -> Vec<String> {
@@ -216,6 +260,133 @@ mod tests {
         let answer = service.answer("what?").unwrap();
         assert!(answer.text.contains("[doc.md - Intro - p.2]"));
         assert!(!answer.text.contains("p.9"));
+        assert_eq!(
+            generator.calls(),
+            2,
+            "the invalid citation takes one repair"
+        );
+    }
+
+    enum Step {
+        Answer(String),
+        Fail,
+    }
+
+    struct SequenceGenerator {
+        steps: std::sync::Mutex<std::collections::VecDeque<Step>>,
+        prompts: std::sync::Mutex<Vec<String>>,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl SequenceGenerator {
+        fn new(steps: Vec<Step>) -> Self {
+            Self {
+                steps: std::sync::Mutex::new(steps.into()),
+                prompts: std::sync::Mutex::new(Vec::new()),
+                calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(std::sync::atomic::Ordering::SeqCst)
+        }
+
+        fn prompts(&self) -> Vec<String> {
+            self.prompts.lock().unwrap().clone()
+        }
+    }
+
+    impl Generator for SequenceGenerator {
+        fn generate(&self, prompt: &str) -> Result<String, GenerationError> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.prompts.lock().unwrap().push(prompt.to_string());
+            match self.steps.lock().unwrap().pop_front() {
+                Some(Step::Answer(answer)) => Ok(answer),
+                Some(Step::Fail) | None => Err(GenerationError::Client(
+                    crate::ollama::OllamaError::Transport {
+                        path: "/api/generate".to_string(),
+                        message: "connection refused".to_string(),
+                    },
+                )),
+            }
+        }
+    }
+
+    #[test]
+    fn uncited_answer_takes_one_bounded_repair() {
+        let retrieval = FixedRetrieval::new(vec![candidate(2, "the answer is 42")]);
+        let generator = SequenceGenerator::new(vec![
+            Step::Answer("It is 42.".to_string()),
+            Step::Answer("It is 42 [doc.md - Intro - p.2].".to_string()),
+        ]);
+        let service = AnswerService::new(&retrieval, &generator, 1000);
+
+        let answer = service.answer("what?").unwrap();
+        assert_eq!(answer.text, "It is 42 [doc.md - Intro - p.2].");
+        assert_eq!(answer.references, vec!["doc.md - Intro - p.2".to_string()]);
+        assert_eq!(generator.calls(), 2);
+        let prompts = generator.prompts();
+        assert!(prompts[1].contains("YOUR PREVIOUS ANSWER:\nIt is 42."));
+        assert!(prompts[1].ends_with("REPAIRED ANSWER:"));
+    }
+
+    #[test]
+    fn unsuccessful_repair_is_stripped_and_not_retried() {
+        let retrieval = FixedRetrieval::new(vec![candidate(2, "body")]);
+        let generator = SequenceGenerator::new(vec![
+            Step::Answer("Fact [doc.md - Intro - p.9].".to_string()),
+            Step::Answer("Still [doc.md - Intro - p.9].".to_string()),
+            Step::Answer("A third call must never happen.".to_string()),
+        ]);
+        let service = AnswerService::new(&retrieval, &generator, 1000);
+
+        let answer = service.answer("what?").unwrap();
+        assert_eq!(generator.calls(), 2, "repair is bounded to one retry");
+        assert!(!answer.text.contains("p.9"));
+        assert!(answer.references.is_empty());
+    }
+
+    #[test]
+    fn failed_repair_falls_back_to_stripping_the_original() {
+        let retrieval = FixedRetrieval::new(vec![candidate(2, "body")]);
+        let generator = SequenceGenerator::new(vec![
+            Step::Answer("Fact [doc.md - Intro - p.9].".to_string()),
+            Step::Fail,
+        ]);
+        let service = AnswerService::new(&retrieval, &generator, 1000);
+
+        let answer = service
+            .answer("what?")
+            .expect("a repair failure must not fail the answer");
+        assert_eq!(generator.calls(), 2);
+        assert!(!answer.text.contains("p.9"));
+        assert!(answer.text.contains("Fact"));
+    }
+
+    #[test]
+    fn clean_answer_does_not_take_a_repair() {
+        let retrieval = FixedRetrieval::new(vec![candidate(2, "body")]);
+        let generator = SequenceGenerator::new(vec![Step::Answer(
+            "Fact [doc.md - Intro - p.2].".to_string(),
+        )]);
+        let service = AnswerService::new(&retrieval, &generator, 1000);
+
+        let answer = service.answer("what?").unwrap();
+        assert_eq!(generator.calls(), 1);
+        assert_eq!(answer.references, vec!["doc.md - Intro - p.2".to_string()]);
+    }
+
+    #[test]
+    fn disabled_validation_returns_the_raw_answer() {
+        let retrieval = FixedRetrieval::new(vec![candidate(2, "body")]);
+        let generator = SequenceGenerator::new(vec![Step::Answer("uncited answer".to_string())]);
+        let service =
+            AnswerService::new(&retrieval, &generator, 1000).with_citation_validation(false);
+
+        let answer = service.answer("what?").unwrap();
+        assert_eq!(generator.calls(), 1);
+        assert_eq!(answer.text, "uncited answer");
+        assert!(answer.references.is_empty());
     }
 
     struct FailingRetrieval;

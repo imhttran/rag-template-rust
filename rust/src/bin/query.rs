@@ -138,7 +138,8 @@ fn run() -> Result<ExitCode, String> {
     } else {
         DEFAULT_CONTEXT_BUDGET
     };
-    let service = AnswerService::new(&retrieval, &generator, budget);
+    let service = AnswerService::new(&retrieval, &generator, budget)
+        .with_citation_validation(config.rag_citation_validation);
     let answer = service
         .answer(&question)
         .map_err(|err| format!("answer failed: {err}"))?;

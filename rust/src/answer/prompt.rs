@@ -34,20 +34,13 @@ pub fn build(question: &str, passages: &[ContextPassage]) -> String {
     prompt.push('\n');
     prompt.push_str(CONTEXT_OPEN);
     prompt.push('\n');
-    for passage in passages {
-        let source = if passage.source.is_empty() {
-            "unknown"
-        } else {
-            passage.source.as_str()
-        };
-        prompt.push_str(&format!("Source: {source}\n"));
-        prompt.push_str(&format!("Section: {}\n", passage.section));
-        if let Some(page) = passage.page {
-            prompt.push_str(&format!("Page: {page}\n"));
-        }
-        prompt.push_str(&format!("Content: {}", passage.content));
-        prompt.push_str("\n\n---\n\n");
+    let context = render_context(passages);
+    if context.is_empty() {
+        prompt.push_str("(no retrieved context)");
+    } else {
+        prompt.push_str(&context);
     }
+    prompt.push('\n');
     prompt.push_str(CONTEXT_CLOSE);
     prompt.push_str("\n\nUSER QUESTION:\n");
     prompt.push_str(question);
@@ -71,6 +64,53 @@ pub fn build(question: &str, passages: &[ContextPassage]) -> String {
          ANSWER:",
     );
     prompt
+}
+
+/// Renders the retrieved passages in the Go baseline `FormatContext` shape:
+/// `Source:`, `Section:`, optional `Page:`, then `Content:`, with passages
+/// separated by a blank line and `---`.
+fn render_context(passages: &[ContextPassage]) -> String {
+    passages
+        .iter()
+        .map(render_passage)
+        .collect::<Vec<_>>()
+        .join("\n\n---\n\n")
+}
+
+fn render_passage(passage: &ContextPassage) -> String {
+    let source = if passage.source.is_empty() {
+        "unknown"
+    } else {
+        passage.source.as_str()
+    };
+    let mut block = format!("Source: {source}\nSection: {}\n", passage.section);
+    if let Some(page) = passage.page {
+        block.push_str(&format!("Page: {page}\n"));
+    }
+    block.push_str(&format!("Content: {}", passage.content));
+    block
+}
+
+/// Builds the single bounded citation-repair prompt.
+///
+/// Ported from the Go baseline `repairPrompt`: the retrieved context is
+/// repeated, the previous answer is shown, and the citation contract is
+/// restated. Callers issue this prompt at most once.
+pub fn repair_build(question: &str, passages: &[ContextPassage], previous: &str) -> String {
+    let context = render_context(passages);
+    format!(
+        "You previously answered a question but included citations that do not appear in the retrieved context.\n\n\
+RETRIEVED CONTEXT:\n{context}\n\n\
+USER QUESTION:\n{question}\n\n\
+YOUR PREVIOUS ANSWER:\n{previous}\n\n\
+REPAIR INSTRUCTIONS:\n\
+- Rewrite the answer using only the RETRIEVED CONTEXT.\n\
+- Cite every factual claim with exactly this format: [source - section]\n\
+- Copy the source and section exactly as they appear in the RETRIEVED CONTEXT (\"Source:\" and \"Section:\").\n\
+- Remove every citation that does not name a source and section from the RETRIEVED CONTEXT.\n\
+- If the retrieved context does not contain enough information, say \"I do not have enough information.\"\n\n\
+REPAIRED ANSWER:"
+    )
 }
 
 #[cfg(test)]
@@ -125,5 +165,26 @@ mod tests {
         let instr_close = prompt.find(INSTRUCTIONS_CLOSE).unwrap();
         let ctx_open = prompt.find(CONTEXT_OPEN).unwrap();
         assert!(instr_close < ctx_open);
+    }
+
+    #[test]
+    fn empty_context_is_labelled() {
+        let prompt = build("what?", &[]);
+        assert!(prompt.contains("(no retrieved context)"));
+    }
+
+    #[test]
+    fn repair_prompt_carries_context_question_and_previous_answer() {
+        let prompt = repair_build(
+            "what?",
+            &[passage("Payments", Some(2), "body")],
+            "old answer",
+        );
+        assert!(prompt.contains("Source: doc.md\nSection: Payments\nPage: 2\nContent: body"));
+        assert!(prompt.contains("USER QUESTION:\nwhat?"));
+        assert!(prompt.contains("YOUR PREVIOUS ANSWER:\nold answer"));
+        assert!(prompt
+            .contains("Cite every factual claim with exactly this format: [source - section]"));
+        assert!(prompt.ends_with("REPAIRED ANSWER:"));
     }
 }

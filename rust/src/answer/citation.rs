@@ -43,7 +43,11 @@ fn parse_page_segment(segment: &str) -> Option<u32> {
 }
 
 fn parse_inner(raw: &str) -> Option<Citation> {
-    let inner = raw.strip_prefix('[')?.strip_suffix(']')?.trim();
+    // Do not trim the bracket's inner text before splitting: the Go baseline
+    // cuts on " - " in the raw inner text, so a trailing separator such as
+    // "[Source: doc.md - ]" is still parsed (with an empty section) and then
+    // rejected as invalid. Trimming first would hide it from the parser.
+    let inner = raw.strip_prefix('[')?.strip_suffix(']')?;
     let normalized = normalize(inner);
     let (source, rest) = normalized.split_once(" - ")?;
     let mut citation = Citation {
@@ -110,6 +114,29 @@ pub fn matches(citation: &Citation, passage: &ContextPassage) -> bool {
 /// Returns true when `citation` matches any retrieved passage.
 pub fn is_valid(citation: &Citation, passages: &[ContextPassage]) -> bool {
     passages.iter().any(|passage| matches(citation, passage))
+}
+
+/// Counts the citations in `answer` and how many of them resolve to a
+/// retrieved passage, in the same terms as the Go baseline's `Validity`.
+pub fn validity(answer: &str, passages: &[ContextPassage]) -> (usize, usize) {
+    let citations = parse(answer);
+    let total = citations.len();
+    let valid = citations
+        .iter()
+        .filter(|citation| is_valid(citation, passages))
+        .count();
+    (valid, total)
+}
+
+/// Reports whether `answer` needs no repair: it makes at least one citation
+/// and every citation resolves to a retrieved passage.
+///
+/// An answer that cites nothing is not clean, matching the Go baseline: a
+/// missing citation is treated like an invalid one and takes the single bounded
+/// repair path.
+pub fn is_clean(answer: &str, passages: &[ContextPassage]) -> bool {
+    let (valid, total) = validity(answer, passages);
+    total > 0 && valid == total
 }
 
 fn needs_separator(prefix: &str, suffix: &str) -> bool {
@@ -195,5 +222,36 @@ mod tests {
         let passages = vec![passage("doc.md", "Payments", Some(2))];
         let answer = "A [doc.md - Payments] B [doc.md - Other] C";
         assert_eq!(repair(answer, &passages), "A [doc.md - Payments] B  C");
+    }
+
+    #[test]
+    fn trailing_separator_without_section_is_parsed_then_rejected() {
+        let passages = vec![passage("doc.md", "Payments", Some(2))];
+        let answer = "Fact [Source: doc.md - ]";
+        let parsed = parse(answer);
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].source, "Source: doc.md");
+        assert_eq!(parsed[0].section, "");
+        assert!(!is_valid(&parsed[0], &passages));
+        assert_eq!(repair(answer, &passages), "Fact ");
+    }
+
+    #[test]
+    fn validity_counts_valid_and_total() {
+        let passages = vec![passage("doc.md", "Payments", Some(2))];
+        assert_eq!(
+            validity("A [doc.md - Payments] B [doc.md - Other]", &passages),
+            (1, 2)
+        );
+        assert_eq!(validity("no citations", &passages), (0, 0));
+    }
+
+    #[test]
+    fn clean_requires_at_least_one_valid_citation() {
+        let passages = vec![passage("doc.md", "Payments", Some(2))];
+        assert!(is_clean("[doc.md - Payments]", &passages));
+        assert!(is_clean("[doc.md - Payments - p.2]", &passages));
+        assert!(!is_clean("[doc.md - Other]", &passages));
+        assert!(!is_clean("uncited prose", &passages));
     }
 }
