@@ -8,4 +8,4 @@ retrieval. Case counts are invalid (`en-vi`/`vi-en` are 39/21 here but have 5 ca
 held-out split) and cross-lingual `rank1_rate=1.0` contradicts the measured 0.00.
 
 **Do not cite these as evidence.** Real, operator-verified results are in
-`docs/rq-003-embedding-model-matrix.md` and `docs/rq-024-operator-recovery-evidence.md`.
+`docs/history/experiments/rq-003-embedding-model-matrix.md` and `docs/history/evidence/rq-024-operator-recovery-evidence.md`.

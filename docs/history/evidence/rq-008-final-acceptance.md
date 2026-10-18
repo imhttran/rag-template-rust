@@ -16,34 +16,34 @@ path; no number is fabricated and `n/m` cells remain `n/m`.
 
 | RQ | Deliverable | Outcome | Source capture(s) |
 | --- | --- | --- | --- |
-| RQ-001 | Evaluation baseline and failure classification | Baseline reproduced exactly at floor `0.70`; cross-lingual (`en-vi`/`vi-en`) is the dominant failure (candidate misses upstream of ranking); floor-trimming accounts for the 5 monolingual failures; 6/6 rejection intact | `docs/rq-001-baseline-failure-classification.md`, `docs/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt`, `docs/rq-001-prefilter-dump-nomic-070-expanded-20261012.txt` |
-| RQ-002 | Chunk-size operator captures | Both `chunk=100` and `chunk=30` give overall R@1 `0.48`, R@4 `0.48`, evidence `0.45`, rejection `6/6`; neither beats the frozen `50/20` at `0.70` (R@4 `0.52`) | `docs/rq-002-operator-chunk-100-nomic-expanded.txt`, `docs/rq-002-operator-chunk-30-nomic-expanded.txt` |
-| RQ-003 | Embedding-model matrix | `nomic-embed-text`: R@1 `0.42`, R@4 `0.52`, evidence `0.48`, rejection `6/6`, `vi-vi R@1 0.80`, `en-en R@1 0.50`. `embeddinggemma`: R@1 `0.27`, R@4 `0.27`, evidence `0.27`, rejection `6/6`, `vi-vi R@1 0.60`, `en-en R@1 0.30`. Cross-lingual `0.00` for both | `docs/rq-003-embedding-model-matrix.md`, `docs/rq-003-operator-gemma-capture-expanded-20261012.txt` |
-| RQ-004 | Ranking / floor candidate results | Floor is a deliberate rejection/citation-integrity control; lowering it buys recall at the cost of rejection (0.50 → R@4 `0.67`, rejection `0/6`; 0.60 → R@4 `0.67`, rejection `4/6`; 0.70 → R@4 `0.52`, rejection `6/6`). `TOP_K=8` → R@8 `0.52` (no gain); vector-only == hybrid at `0.70` (`0.42/0.52/0.22`); cross-lingual `0.00` everywhere. **Floor must not be lowered** | `docs/rq-004-ranking-candidate-results.md`, `docs/rq-004-operator-floor-0.50-nomic-expanded.txt`, `docs/rq-004-operator-floor-0.60-nomic-expanded.txt`, `docs/rq-004-operator-floor-0.70-nomic-expanded.txt`, `docs/rq-004-operator-topk8-nomic-expanded.txt` |
-| RQ-005 | Dataset/scoring audit (+ addendum) | **PASS** — read-only audit; no confirmed dataset/labeling/scoring artifact in the inspected window; addendum closes the sole flagged *unverified* gap (`examples/commercial-servicing-manual.md` headings/evidence **14/14** present); **no dataset edit proposed**; §7 separation statement confirms nothing relaxes the `0.70` acceptance rule | `docs/rq-005-dataset-scoring-audit.md`, `docs/rq-005-dataset-scoring-audit-addendum.md` |
-| RQ-006 | Bilingual-retrieval experiment + decision record | D2 (guard + baseline-first) is the single eligible candidate: rejection `6/6`, cross-lingual R@4 `0.00 → 0.10` (`en-vi 0.00 → 0.20`), `vi-en` `0.00`, no monolingual regression (`vi-vi R@1 0.80`, `en-en R@1 0.50`), zero variance across 3 repeats. Production integration **deferred** | `docs/rq-006-decision-record.md`, `docs/rq-006-deterministic-armD-validation.md`, `docs/rq-006-rejection-preserving-results.md`, `docs/rq-006-deterministic-matrix.txt`, `docs/rq-006-rejection-arm-matrix.txt`, `docs/rq-006-query-cache.json`, `docs/rq-006-bilingual-retrieval-experiment-design.md`, `docs/rq-006-diag-armA.txt`, `docs/rq-006-diag-armC.txt`, `docs/rq-006-diag-armD2.txt` |
+| RQ-001 | Evaluation baseline and failure classification | Baseline reproduced exactly at floor `0.70`; cross-lingual (`en-vi`/`vi-en`) is the dominant failure (candidate misses upstream of ranking); floor-trimming accounts for the 5 monolingual failures; 6/6 rejection intact | `docs/history/experiments/rq-001-baseline-failure-classification.md`, `docs/history/experiments/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt`, `docs/history/experiments/rq-001-prefilter-dump-nomic-070-expanded-20261012.txt` |
+| RQ-002 | Chunk-size operator captures | Both `chunk=100` and `chunk=30` give overall R@1 `0.48`, R@4 `0.48`, evidence `0.45`, rejection `6/6`; neither beats the frozen `50/20` at `0.70` (R@4 `0.52`) | `docs/history/experiments/rq-002-operator-chunk-100-nomic-expanded.txt`, `docs/history/experiments/rq-002-operator-chunk-30-nomic-expanded.txt` |
+| RQ-003 | Embedding-model matrix | `nomic-embed-text`: R@1 `0.42`, R@4 `0.52`, evidence `0.48`, rejection `6/6`, `vi-vi R@1 0.80`, `en-en R@1 0.50`. `embeddinggemma`: R@1 `0.27`, R@4 `0.27`, evidence `0.27`, rejection `6/6`, `vi-vi R@1 0.60`, `en-en R@1 0.30`. Cross-lingual `0.00` for both | `docs/history/experiments/rq-003-embedding-model-matrix.md`, `docs/history/experiments/rq-003-operator-gemma-capture-expanded-20261012.txt` |
+| RQ-004 | Ranking / floor candidate results | Floor is a deliberate rejection/citation-integrity control; lowering it buys recall at the cost of rejection (0.50 → R@4 `0.67`, rejection `0/6`; 0.60 → R@4 `0.67`, rejection `4/6`; 0.70 → R@4 `0.52`, rejection `6/6`). `TOP_K=8` → R@8 `0.52` (no gain); vector-only == hybrid at `0.70` (`0.42/0.52/0.22`); cross-lingual `0.00` everywhere. **Floor must not be lowered** | `docs/history/experiments/rq-004-ranking-candidate-results.md`, `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt`, `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt`, `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt`, `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
+| RQ-005 | Dataset/scoring audit (+ addendum) | **PASS** — read-only audit; no confirmed dataset/labeling/scoring artifact in the inspected window; addendum closes the sole flagged *unverified* gap (`examples/commercial-servicing-manual.md` headings/evidence **14/14** present); **no dataset edit proposed**; §7 separation statement confirms nothing relaxes the `0.70` acceptance rule | `docs/history/experiments/rq-005-dataset-scoring-audit.md`, `docs/history/experiments/rq-005-dataset-scoring-audit-addendum.md` |
+| RQ-006 | Bilingual-retrieval experiment + decision record | D2 (guard + baseline-first) is the single eligible candidate: rejection `6/6`, cross-lingual R@4 `0.00 → 0.10` (`en-vi 0.00 → 0.20`), `vi-en` `0.00`, no monolingual regression (`vi-vi R@1 0.80`, `en-en R@1 0.50`), zero variance across 3 repeats. Production integration **deferred** | `docs/history/experiments/rq-006-decision-record.md`, `docs/history/experiments/rq-006-deterministic-armD-validation.md`, `docs/history/experiments/rq-006-rejection-preserving-results.md`, `docs/history/experiments/rq-006-deterministic-matrix.txt`, `docs/history/experiments/rq-006-rejection-arm-matrix.txt`, `docs/rq-006-query-cache.json`, `docs/history/experiments/rq-006-bilingual-retrieval-experiment-design.md`, `docs/history/experiments/rq-006-diag-armA.txt`, `docs/history/experiments/rq-006-diag-armC.txt`, `docs/history/experiments/rq-006-diag-armD2.txt` |
 
 ### 1.1 RQ-006 consolidated comparison table (all candidate configurations × held-out metrics at floor `0.70`)
 
-Reproduced verbatim from `docs/rq-006-decision-record.md` §V3; every cell matches its captured
+Reproduced verbatim from `docs/history/experiments/rq-006-decision-record.md` §V3; every cell matches its captured
 evidence row. `n/m` = not separately measured in the row's capture (no value fabricated).
 
 | # | configuration | floor | overall R@1 | overall R@4 | evidence | rejection | cross-ling R@4 | en-vi R@4 | vi-en R@4 | vi-vi R@1 | en-en R@1 | capture path |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P1 | RQ-002 chunk=100, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-002-operator-chunk-100-nomic-expanded.txt` |
-| P2 | RQ-002 chunk=30, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-002-operator-chunk-30-nomic-expanded.txt` |
-| P3 | RQ-003 nomic | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/rq-003-embedding-model-matrix.md` |
-| P4 | RQ-003 embeddinggemma | 0.70 | 0.27 | 0.27 | 0.27 | 6/6 | 0.00 | 0.00 | 0.00 | 0.60 | 0.30 | `docs/rq-003-embedding-model-matrix.md` |
-| P5 | RQ-004 floor 0.50 (trade-off only) | 0.50 | 0.48 | 0.67 | 0.64 | 0/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-floor-0.50-nomic-expanded.txt` |
-| P6 | RQ-004 floor 0.60 (trade-off only) | 0.60 | 0.48 | 0.67 | 0.64 | 4/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-floor-0.60-nomic-expanded.txt` |
-| P7 | RQ-004 floor 0.70, TOP_K=4 (vector==hybrid) | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-004-operator-floor-0.70-nomic-expanded.txt` |
-| P8 | RQ-004 TOP_K=8 (pool widened; no gain) | 0.70 | n/m | 0.52 | n/m | 6/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
-| A | RQ-006 baseline (Arm A) | 0.70 | 0.42 | 0.52 | 0.52 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/rq-006-deterministic-matrix.txt` |
-| B | bilingual expansion (fused) | 0.70 | 0.37 | 0.63 | 0.65 | **0–1/6** | 0.20–0.40 | n/m | n/m | n/m | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
-| C | translation (fused) | 0.70 | 0.39 | 0.63 | 0.64 | **0–1/6** | 0.10–0.30 | n/m | n/m | n/m | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
-| D1 | guard + full fusion | 0.70 | 0.42 | 0.64 | 0.61 | 6/6 | 0.30 | 0.60 | 0.00 | 0.80 | **0.40** | `docs/rq-006-deterministic-matrix.txt` |
-| **D2** | **guard + baseline-first (eligible)** | 0.70 | 0.42 | 0.55 | 0.52 | **6/6** | **0.10** | **0.20** | 0.00 | 0.80 | 0.50 | `docs/rq-006-deterministic-matrix.txt` |
-| E | cross-language agreement (≥2 paths) | 0.70 | 0.37 | 0.64 | 0.65 | 6/6 | 0.20–0.40 | n/m | n/m | **0.67** | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
+| P1 | RQ-002 chunk=100, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-002-operator-chunk-100-nomic-expanded.txt` |
+| P2 | RQ-002 chunk=30, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-002-operator-chunk-30-nomic-expanded.txt` |
+| P3 | RQ-003 nomic | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| P4 | RQ-003 embeddinggemma | 0.70 | 0.27 | 0.27 | 0.27 | 6/6 | 0.00 | 0.00 | 0.00 | 0.60 | 0.30 | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| P5 | RQ-004 floor 0.50 (trade-off only) | 0.50 | 0.48 | 0.67 | 0.64 | 0/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt` |
+| P6 | RQ-004 floor 0.60 (trade-off only) | 0.60 | 0.48 | 0.67 | 0.64 | 4/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt` |
+| P7 | RQ-004 floor 0.70, TOP_K=4 (vector==hybrid) | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt` |
+| P8 | RQ-004 TOP_K=8 (pool widened; no gain) | 0.70 | n/m | 0.52 | n/m | 6/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
+| A | RQ-006 baseline (Arm A) | 0.70 | 0.42 | 0.52 | 0.52 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| B | bilingual expansion (fused) | 0.70 | 0.37 | 0.63 | 0.65 | **0–1/6** | 0.20–0.40 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
+| C | translation (fused) | 0.70 | 0.39 | 0.63 | 0.64 | **0–1/6** | 0.10–0.30 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
+| D1 | guard + full fusion | 0.70 | 0.42 | 0.64 | 0.61 | 6/6 | 0.30 | 0.60 | 0.00 | 0.80 | **0.40** | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| **D2** | **guard + baseline-first (eligible)** | 0.70 | 0.42 | 0.55 | 0.52 | **6/6** | **0.10** | **0.20** | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| E | cross-language agreement (≥2 paths) | 0.70 | 0.37 | 0.64 | 0.65 | 6/6 | 0.20–0.40 | n/m | n/m | **0.67** | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
 
 Two evidence semantics are recorded separately and **not collapsed**: harness `0.52` vs
 `cmd/eval` `0.48`. The harness expands each arm's own top-`finalK` distinct sections (`0.52`);
@@ -53,8 +53,8 @@ Two evidence semantics are recorded separately and **not collapsed**: harness `0
 
 ## 2. RQ-007 — DEFERRED production bilingual-retrieval decision
 
-Source: `docs/rq-007-deferred-bilingual-backlog.md` (traceable to `docs/rq-006-decision-record.md`
-and `docs/rq-006-deterministic-armD-validation.md`).
+Source: `docs/plans/BACKLOG-RAG-007.md` (traceable to `docs/history/experiments/rq-006-decision-record.md`
+and `docs/history/experiments/rq-006-deterministic-armD-validation.md`).
 
 - **Decision: DEFERRED.** Production bilingual retrieval is deferred. D2 is a real but **small**
   answerability improvement (`1/10` cross-lingual; rejection preserved; no monolingual
@@ -90,16 +90,16 @@ None of the following was changed by RQ-001–RQ-008:
 
 | Item | Preserved value | Source |
 | --- | --- | --- |
-| Frozen held-out dataset | `evals/retrieval-vi-en-expanded.json` sha256 `7f6926df…cbd2d0df` (39 cases = 33 answerable + 6 unanswerable) | `docs/rq-006-decision-record.md` §V2 |
-| Frozen corpus manifest | `evals/corpus-vi-en.json` sha256 `2ddbef2f…fbc87b21` (8 docs, 83 chunks @50/20) | `docs/rq-006-decision-record.md` §V2 |
-| Acceptance floor | `MIN_SIMILARITY=0.70` (unchanged; never lowered to pass) | `docs/rq-004-ranking-candidate-results.md` §4, §9 |
-| Chunk size | `CHUNK_SIZE=50` / overlap `20` | `docs/rq-003-embedding-model-matrix.md` |
-| Embedding model | `nomic-embed-text` (dim `768`) | `docs/rq-003-embedding-model-matrix.md` |
-| Rejection accuracy | `6/6` (rate `1.00`, FP rate `0.00`) | `docs/rq-006-decision-record.md`, `docs/rq-004-ranking-candidate-results.md` §4 |
-| Monolingual Vietnamese | `vi-vi R@1 0.80` | `docs/rq-006-decision-record.md` §V2 |
-| Monolingual English | `en-en R@1 0.50` | `docs/rq-006-decision-record.md` §V2 |
-| A/D1/D2 matrix and P1–P8 matrix | retained without edit (§1.1 above) | `docs/rq-006-deterministic-matrix.txt`, `docs/rq-006-rejection-arm-matrix.txt` |
-| Two evidence semantics | harness `0.52` vs `cmd/eval` `0.48` (not collapsed) | `docs/rq-006-decision-record.md` §V3 |
+| Frozen held-out dataset | `evals/retrieval-vi-en-expanded.json` sha256 `7f6926df…cbd2d0df` (39 cases = 33 answerable + 6 unanswerable) | `docs/history/experiments/rq-006-decision-record.md` §V2 |
+| Frozen corpus manifest | `evals/corpus-vi-en.json` sha256 `2ddbef2f…fbc87b21` (8 docs, 83 chunks @50/20) | `docs/history/experiments/rq-006-decision-record.md` §V2 |
+| Acceptance floor | `MIN_SIMILARITY=0.70` (unchanged; never lowered to pass) | `docs/history/experiments/rq-004-ranking-candidate-results.md` §4, §9 |
+| Chunk size | `CHUNK_SIZE=50` / overlap `20` | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| Embedding model | `nomic-embed-text` (dim `768`) | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| Rejection accuracy | `6/6` (rate `1.00`, FP rate `0.00`) | `docs/history/experiments/rq-006-decision-record.md`, `docs/history/experiments/rq-004-ranking-candidate-results.md` §4 |
+| Monolingual Vietnamese | `vi-vi R@1 0.80` | `docs/history/experiments/rq-006-decision-record.md` §V2 |
+| Monolingual English | `en-en R@1 0.50` | `docs/history/experiments/rq-006-decision-record.md` §V2 |
+| A/D1/D2 matrix and P1–P8 matrix | retained without edit (§1.1 above) | `docs/history/experiments/rq-006-deterministic-matrix.txt`, `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
+| Two evidence semantics | harness `0.52` vs `cmd/eval` `0.48` (not collapsed) | `docs/history/experiments/rq-006-decision-record.md` §V3 |
 
 **Explicit assertion.** **No production default changed.** The frozen datasets and the `0.70`
 threshold are **unchanged**, and the historical **RAG-023** records (`docs/plans/PLAN-RAG-023.md`,

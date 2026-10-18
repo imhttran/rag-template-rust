@@ -480,7 +480,7 @@ file.
 > RQ-001 agent could not run a live database/embedding sweep; an operator ran the frozen
 > experiment by hand against a **disposable** database and captured the raw output. It is
 > kept distinct from any SOP-executed validation. Raw capture:
-> `docs/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt` (542 lines). §4’s
+> `docs/history/experiments/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt` (542 lines). §4’s
 > “unavailable” per-case cells are **filled below** where the capture supplies them.
 
 ### 10.1 Exact configuration and commands
@@ -501,7 +501,7 @@ for f in examples/loan-policy.md examples/large-loan-policy.md examples/member-s
   go run ./cmd/ingest "$f"; done
 # evaluate (2 s)
 EVAL_DATASET=evals/retrieval-vi-en-expanded.json MIN_SIMILARITY=0.70 QUERY_REWRITE=false \
-  go run ./cmd/eval > docs/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt
+  go run ./cmd/eval > docs/history/experiments/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt
 ```
 
 Ingest wall ≈ 7 s; eval wall ≈ 2 s; total operator capture ≈ 9 s.
@@ -605,7 +605,7 @@ supported by observed single-candidate outputs but is not a full pre-filter dump
 
 Source: `EVAL_PREFILTER_DUMP=1` run over the frozen 39-case set on the disposable
 `rag_021_test` (nomic-embed-text, floor `0.70`), artifact
-`docs/rq-001-prefilter-dump-nomic-070-expanded-20261012.txt` (117 bounded lines = 39x3).
+`docs/history/experiments/rq-001-prefilter-dump-nomic-070-expanded-20261012.txt` (117 bounded lines = 39x3).
 The `K=4` pre-filter candidate set is used (the candidate set the final ranking draws
 from). The pre-filter list is similarity-ordered, so the expected section survived the
 floor iff its pre-filter **rank <= kept** (`kept` = count with `sim >= 0.70`).

@@ -16,7 +16,7 @@ section): it is non-gating and excluded from the standard suite.
 | Disposable-DB E2E + atomicity | `internal/rag/e2e_db_test.go` |
 | Failure / cancellation / timeout | `internal/rag/reliability_test.go` |
 | Harness usage docs | `docs/guides/testing.md` |
-| This evidence record | `docs/rag-025b-e2e-evidence.md` |
+| This evidence record | `docs/history/evidence/rag-025b-e2e-evidence.md` |
 
 ## Disposable database identity and safety guard
 

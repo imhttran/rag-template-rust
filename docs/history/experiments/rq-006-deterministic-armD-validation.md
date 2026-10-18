@@ -51,5 +51,5 @@ translated/expanded candidates only to fill ranks 2–4. Expected: rejection `6/
 R@4 `0.00 → 0.10` (`en-vi 0.00 → 0.20`), no monolingual regression. If the (small) gain is
 deemed not worth the complexity, **no production change** is the alternative.
 
-*Captures:* `docs/rq-006-deterministic-matrix.txt` (A/D1/D2 × 3), `docs/rq-006-query-cache.json`,
+*Captures:* `docs/history/experiments/rq-006-deterministic-matrix.txt` (A/D1/D2 × 3), `docs/rq-006-query-cache.json`,
 `docs/rq-006-diag-arm{A,C}.txt`. Frozen inputs, the `0.70` threshold, and RAG-023 records unchanged.

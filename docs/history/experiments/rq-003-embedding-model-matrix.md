@@ -66,7 +66,7 @@ OLLAMA_EMBED_MODEL=<model> EVAL_DATASET=evals/retrieval-vi-en-expanded.json \
   MIN_SIMILARITY=0.70 QUERY_REWRITE=false go run ./cmd/eval
 ```
 
-Captures: `docs/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt` (nomic),
-`docs/rq-003-operator-gemma-capture-expanded-20261012.txt` (gemma).
+Captures: `docs/history/experiments/rq-001-per-case-eval-capture-nomic-070-expanded-20261012.txt` (nomic),
+`docs/history/experiments/rq-003-operator-gemma-capture-expanded-20261012.txt` (gemma).
 
 *Operator-measured; the historical record is unchanged; no production default changed.*

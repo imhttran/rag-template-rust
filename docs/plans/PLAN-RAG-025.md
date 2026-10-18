@@ -7,7 +7,7 @@ RAG-024).
 **Baseline:** `main` at `79ed678785767608422f8a05d1bd0bb565a7122b` (RAG-024 completed,
 historicalized, pushed).
 **Does not:** reopen the deferred multilingual cross-lingual retrieval backlog
-(`docs/rq-007-deferred-bilingual-backlog.md`), implement Phase 23b (PDF/OCR), change frozen
+(`docs/plans/BACKLOG-RAG-007.md`), implement Phase 23b (PDF/OCR), change frozen
 evaluation datasets, or alter production defaults without a recorded decision.
 
 ## Project
@@ -81,7 +81,7 @@ Exercise the full ingest → retrieve → generate path and its failure/cancella
 - `internal/rag/reliability_test.go` — failure (endpoint/generation error → clear error, no
   partial write), context cancellation (no hang), and request timeout (bounded failure) tests.
 - Disposable-DB harness usage documented in `docs/guides/testing.md` (never `rag_db`).
-- **Create `docs/rag-025b-e2e-evidence.md`** — the RAG-025B evidence record. It must contain:
+- **Create `docs/history/evidence/rag-025b-e2e-evidence.md`** — the RAG-025B evidence record. It must contain:
   the exact integration-test commands; the disposable database identity and the safety guard
   (refuses `rag_db`); evidence of ingestion, **pgvector** retrieval, and generation; the
   atomicity and reliability test results; the standard Go validation results; and an explicit
@@ -94,7 +94,7 @@ Exercise the full ingest → retrieve → generate path and its failure/cancella
 - Ingestion remains atomic (a failing batch rolls back the whole replacement).
 - Real-Ollama smoke testing is **optional and reported separately**.
 - Gates pass; disposable-PostgreSQL integration tests pass; evidence records commands/config/hashes.
-- **The evidence document `docs/rag-025b-e2e-evidence.md` exists** and records the integration
+- **The evidence document `docs/history/evidence/rag-025b-e2e-evidence.md` exists** and records the integration
   commands, the disposable-DB identity + `rag_db` guard, ingestion/pgvector-retrieval/generation
   evidence, the atomicity + reliability results, and the Go gate results.
 
@@ -226,7 +226,7 @@ graph TD
 
 - Disposable PostgreSQL databases only; **never** modify `rag_db`.
 - Frozen evaluation datasets and the `0.70` threshold unchanged; **do not** reopen the deferred
-  multilingual retrieval work (`docs/rq-007-deferred-bilingual-backlog.md`).
+  multilingual retrieval work (`docs/plans/BACKLOG-RAG-007.md`).
 - Preserve RAG-023/RAG-024 historical evidence and archives; preserve unrelated user-owned
   files (`docs/plans/PLAN-RAG-Phase-23.md`, `docs/sop-defect-historicalize-stale-approval.md`).
 - No model downloads; bound all external commands/model calls with timeouts.

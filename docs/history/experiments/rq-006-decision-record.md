@@ -53,8 +53,8 @@ worth a production bilingual-retrieval path as-is. The findings are preserved as
 for the unresolved `vi-en` direction). **No production change recommended at this time.**
 
 ## References
-`docs/rq-006-rejection-preserving-results.md`, `docs/rq-006-deterministic-armD-validation.md`,
-`docs/rq-006-deterministic-matrix.txt`, `docs/rq-006-diag-armD2.txt`, `docs/rq-006-query-cache.json`.
+`docs/history/experiments/rq-006-rejection-preserving-results.md`, `docs/history/experiments/rq-006-deterministic-armD-validation.md`,
+`docs/history/experiments/rq-006-deterministic-matrix.txt`, `docs/history/experiments/rq-006-diag-armD2.txt`, `docs/rq-006-query-cache.json`.
 
 ---
 
@@ -69,11 +69,11 @@ dropped). Captures are referenced by path only; no capture contents are embedded
 The RQ-005 evaluation audit is recorded as **PASS** before any comparison or candidate
 selection:
 
-- `docs/rq-005-dataset-scoring-audit.md` — read-only audit: all inspected dataset
+- `docs/history/experiments/rq-005-dataset-scoring-audit.md` — read-only audit: all inspected dataset
 expectations have stored headings and substring-matchable evidence; read-only attestation;
 Section 7 separation statement states nothing here relaxes the `0.70` acceptance rule; no
 dataset edit applied (proposals only, operator approval required).
-- `docs/rq-005-dataset-scoring-audit-addendum.md` — closes the only flagged *unverified* gap
+- `docs/history/experiments/rq-005-dataset-scoring-audit-addendum.md` — closes the only flagged *unverified* gap
 (`examples/commercial-servicing-manual.md` headings/evidence **14/14 present**); concludes
 **no dataset/scoring/corpus artifact is present** and **no dataset edit is proposed**.
 
@@ -85,14 +85,14 @@ mistaken for a retrieval gain.
 
 | item | value | source path |
 | --- | --- | --- |
-| Dataset hash | `evals/retrieval-vi-en-expanded.json` sha256 `7f6926df…cbd2d0df` (39 = 33 answerable + 6 unanswerable) | `docs/rq-003-embedding-model-matrix.md`, `docs/rq-004-ranking-candidate-results.md` §1 |
-| Corpus hash | `evals/corpus-vi-en.json` sha256 `2ddbef2f…fbc87b21` (8 docs, 83 chunks @50/20) | `docs/rq-003-embedding-model-matrix.md`, `docs/rq-004-ranking-candidate-results.md` §1 |
-| Floor | `MIN_SIMILARITY=0.70` | `docs/rq-004-ranking-candidate-results.md` §4 |
-| Chunk size | `CHUNK_SIZE=50 / overlap=20` | `docs/rq-003-embedding-model-matrix.md` |
-| Embedding model | `nomic-embed-text` (dim 768) | `docs/rq-003-embedding-model-matrix.md` |
-| Chat/query model | `llama3.2:3b` (installed; no download) | `docs/rq-006-deterministic-armD-validation.md` |
-| Pinned decoding | `temperature=0, seed=0, num_predict=64` | `docs/rq-006-deterministic-armD-validation.md` Phase 1 |
-| Query cache | `docs/rq-006-query-cache.json`, keyed by chat model + case id (stores question + `exp`/`vi`/`en` variants) | `docs/rq-006-deterministic-armD-validation.md` Phase 1 |
+| Dataset hash | `evals/retrieval-vi-en-expanded.json` sha256 `7f6926df…cbd2d0df` (39 = 33 answerable + 6 unanswerable) | `docs/history/experiments/rq-003-embedding-model-matrix.md`, `docs/history/experiments/rq-004-ranking-candidate-results.md` §1 |
+| Corpus hash | `evals/corpus-vi-en.json` sha256 `2ddbef2f…fbc87b21` (8 docs, 83 chunks @50/20) | `docs/history/experiments/rq-003-embedding-model-matrix.md`, `docs/history/experiments/rq-004-ranking-candidate-results.md` §1 |
+| Floor | `MIN_SIMILARITY=0.70` | `docs/history/experiments/rq-004-ranking-candidate-results.md` §4 |
+| Chunk size | `CHUNK_SIZE=50 / overlap=20` | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| Embedding model | `nomic-embed-text` (dim 768) | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| Chat/query model | `llama3.2:3b` (installed; no download) | `docs/history/experiments/rq-006-deterministic-armD-validation.md` |
+| Pinned decoding | `temperature=0, seed=0, num_predict=64` | `docs/history/experiments/rq-006-deterministic-armD-validation.md` Phase 1 |
+| Query cache | `docs/rq-006-query-cache.json`, keyed by chat model + case id (stores question + `exp`/`vi`/`en` variants) | `docs/history/experiments/rq-006-deterministic-armD-validation.md` Phase 1 |
 
 The existing A/D1/D2 measurements, the frozen dataset/corpus hashes, the rejection `6/6`
 result, the monolingual `vi-vi R@1 0.80` / `en-en R@1 0.50` results, and the query-cache
@@ -106,24 +106,24 @@ separately and **not** collapsed: harness `0.52` vs `cmd/eval` `0.48`.
 
 | # | configuration | floor | overall R@1 | overall R@4 | evidence | rejection | cross-ling R@4 | en-vi R@4 | vi-en R@4 | vi-vi R@1 | en-en R@1 | capture path |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| P1 | RQ-002 chunk=100, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-002-operator-chunk-100-nomic-expanded.txt` |
-| P2 | RQ-002 chunk=30, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-002-operator-chunk-30-nomic-expanded.txt` |
-| P3 | RQ-003 nomic | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/rq-003-embedding-model-matrix.md` |
-| P4 | RQ-003 embeddinggemma | 0.70 | 0.27 | 0.27 | 0.27 | 6/6 | 0.00 | 0.00 | 0.00 | 0.60 | 0.30 | `docs/rq-003-embedding-model-matrix.md` |
-| P5 | RQ-004 floor 0.50 (trade-off only) | 0.50 | 0.48 | 0.67 | 0.64 | 0/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-floor-0.50-nomic-expanded.txt` |
-| P6 | RQ-004 floor 0.60 (trade-off only) | 0.60 | 0.48 | 0.67 | 0.64 | 4/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-floor-0.60-nomic-expanded.txt` |
-| P7 | RQ-004 floor 0.70, TOP_K=4 (vector==hybrid) | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/rq-004-operator-floor-0.70-nomic-expanded.txt` |
-| P8 | RQ-004 TOP_K=8 (pool widened; no gain) | 0.70 | n/m | 0.52 | n/m | 6/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
-| A | RQ-006 baseline (Arm A) | 0.70 | 0.42 | 0.52 | 0.52 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/rq-006-deterministic-matrix.txt` |
-| B | bilingual expansion (fused) | 0.70 | 0.37 | 0.63 | 0.65 | **0–1/6** | 0.20–0.40 | n/m | n/m | n/m | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
-| C | translation (fused) | 0.70 | 0.39 | 0.63 | 0.64 | **0–1/6** | 0.10–0.30 | n/m | n/m | n/m | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
-| D1 | guard + full fusion | 0.70 | 0.42 | 0.64 | 0.61 | 6/6 | 0.30 | 0.60 | 0.00 | 0.80 | **0.40** | `docs/rq-006-deterministic-matrix.txt` |
-| **D2** | **guard + baseline-first (eligible)** | 0.70 | 0.42 | 0.55 | 0.52 | **6/6** | **0.10** | **0.20** | 0.00 | 0.80 | 0.50 | `docs/rq-006-deterministic-matrix.txt` |
-| E | cross-language agreement (≥2 paths) | 0.70 | 0.37 | 0.64 | 0.65 | 6/6 | 0.20–0.40 | n/m | n/m | **0.67** | n/m | `docs/rq-006-rejection-arm-matrix.txt` |
+| P1 | RQ-002 chunk=100, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-002-operator-chunk-100-nomic-expanded.txt` |
+| P2 | RQ-002 chunk=30, nomic | 0.70 | 0.48 | 0.48 | 0.45 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-002-operator-chunk-30-nomic-expanded.txt` |
+| P3 | RQ-003 nomic | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| P4 | RQ-003 embeddinggemma | 0.70 | 0.27 | 0.27 | 0.27 | 6/6 | 0.00 | 0.00 | 0.00 | 0.60 | 0.30 | `docs/history/experiments/rq-003-embedding-model-matrix.md` |
+| P5 | RQ-004 floor 0.50 (trade-off only) | 0.50 | 0.48 | 0.67 | 0.64 | 0/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt` |
+| P6 | RQ-004 floor 0.60 (trade-off only) | 0.60 | 0.48 | 0.67 | 0.64 | 4/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt` |
+| P7 | RQ-004 floor 0.70, TOP_K=4 (vector==hybrid) | 0.70 | 0.42 | 0.52 | 0.48 | 6/6 | 0.00 | 0.00 | 0.00 | n/m | n/m | `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt` |
+| P8 | RQ-004 TOP_K=8 (pool widened; no gain) | 0.70 | n/m | 0.52 | n/m | 6/6 | 0.00 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
+| A | RQ-006 baseline (Arm A) | 0.70 | 0.42 | 0.52 | 0.52 | 6/6 | 0.00 | 0.00 | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| B | bilingual expansion (fused) | 0.70 | 0.37 | 0.63 | 0.65 | **0–1/6** | 0.20–0.40 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
+| C | translation (fused) | 0.70 | 0.39 | 0.63 | 0.64 | **0–1/6** | 0.10–0.30 | n/m | n/m | n/m | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
+| D1 | guard + full fusion | 0.70 | 0.42 | 0.64 | 0.61 | 6/6 | 0.30 | 0.60 | 0.00 | 0.80 | **0.40** | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| **D2** | **guard + baseline-first (eligible)** | 0.70 | 0.42 | 0.55 | 0.52 | **6/6** | **0.10** | **0.20** | 0.00 | 0.80 | 0.50 | `docs/history/experiments/rq-006-deterministic-matrix.txt` |
+| E | cross-language agreement (≥2 paths) | 0.70 | 0.37 | 0.64 | 0.65 | 6/6 | 0.20–0.40 | n/m | n/m | **0.67** | n/m | `docs/history/experiments/rq-006-rejection-arm-matrix.txt` |
 
 `n/m` = not separately measured in the row's capture (no value fabricated). Arm-level rows A/B/C/D/E
-are the RQ-006 A–E matrix (`docs/rq-006-rejection-arm-matrix.txt`, A–E × 3 reps); A/D1/D2 rows are
-the pinned-decoding matrix (`docs/rq-006-deterministic-matrix.txt`, A/D1/D2 × 3 reps). Pre-RQ-006
+are the RQ-006 A–E matrix (`docs/history/experiments/rq-006-rejection-arm-matrix.txt`, A–E × 3 reps); A/D1/D2 rows are
+the pinned-decoding matrix (`docs/history/experiments/rq-006-deterministic-matrix.txt`, A/D1/D2 × 3 reps). Pre-RQ-006
 baselines (P1–P8) are retained from RQ-002/003/004 captures without edit. Evidence semantics:
 the harness expands each arm's own top-`finalK` distinct sections (`0.52`); `cmd/eval` fuses
 `finalK` docs then dedups (`0.48`) — both recorded, neither collapsed.
@@ -133,12 +133,12 @@ the harness expands each arm's own top-`finalK` distinct sections (`0.52`); `cmd
 - **Measured improvement (a retrieval gain):** the rejection-preserving D2 guard raises
   cross-lingual `R@4` `0.00 → 0.10` (`en-vi 0.00 → 0.20`) while rejection stays `6/6` and
   monolingual `R@1` is unchanged — a candidate-availability gain, cited to
-  `docs/rq-006-deterministic-matrix.txt` (D2 × 3) and `docs/rq-006-deterministic-armD-validation.md`
+  `docs/history/experiments/rq-006-deterministic-matrix.txt` (D2 × 3) and `docs/history/experiments/rq-006-deterministic-armD-validation.md`
   Phase 4.
 - **Audit artifact (dataset/scoring conformance):** the RQ-005 findings are dataset/scoring
   conformance statements only. No confirmed labeling artifact exists in the inspected window
   and the addendum closed the sole *unverified* entry with **14/14** evidence present and **no
-  dataset edit proposed** (`docs/rq-005-dataset-scoring-audit.md` §7; addendum §5). The audit
+  dataset edit proposed** (`docs/history/experiments/rq-005-dataset-scoring-audit.md` §7; addendum §5). The audit
   **never relaxes the `0.70` rule**. Per the RQ-005 separation statement, audit findings are kept
   distinct from any improvement measurement, so no candidate's recall gain is attributable to a
   dataset/labeling/scoring artifact.
@@ -152,7 +152,7 @@ the harness expands each arm's own top-`finalK` distinct sections (`0.52`); `cmd
   `1/10` cross-lingual; **guard-accepted cross-lingual recall is also `1/10`** — the guard did not
   reject the one recovered case, `eval-en-vi-02` (`guardOK=true`, 4 candidates; `r4=1.00`), so the
   correct candidate is available to the answer generator. The gain is candidate availability, not
-  a synthetic metric (`docs/rq-006-deterministic-armD-validation.md`; `docs/rq-006-diag-armD2.txt`).
+  a synthetic metric (`docs/history/experiments/rq-006-deterministic-armD-validation.md`; `docs/history/experiments/rq-006-diag-armD2.txt`).
 
 ### V5. Ranked recommendation with limitations
 
@@ -168,12 +168,12 @@ the harness expands each arm's own top-`finalK` distinct sections (`0.52`); `cmd
 Limitations: the `vi-en` direction remains `0.00` in **every** arm (embedding miss, upstream of
 ranking); results depend on one small local model (`llama3.2:3b`) with no download; the corpus is
 8 documents (anecdotal cross-lingual power). The ranked recommendation is consistent with
-`docs/rq-006-rejection-preserving-results.md` §6/§7.4 and
-`docs/rq-006-deterministic-armD-validation.md` Phase 4. **No production retrieval change is
+`docs/history/experiments/rq-006-rejection-preserving-results.md` §6/§7.4 and
+`docs/history/experiments/rq-006-deterministic-armD-validation.md` Phase 4. **No production retrieval change is
 recommended or implied here**; production integration of any guard is deferred to **RQ-007**
 (evaluation-only change first).
 
 *Traceability:* every recommendation above is traceable to a captured evidence row —
-`docs/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/rq-006-deterministic-matrix.txt`
-(A/D1/D2 × 3), `docs/rq-006-diag-armD2.txt`, `docs/rq-006-query-cache.json`, and
-`docs/rq-006-deterministic-armD-validation.md`.
+`docs/history/experiments/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/history/experiments/rq-006-deterministic-matrix.txt`
+(A/D1/D2 × 3), `docs/history/experiments/rq-006-diag-armD2.txt`, `docs/rq-006-query-cache.json`, and
+`docs/history/experiments/rq-006-deterministic-armD-validation.md`.

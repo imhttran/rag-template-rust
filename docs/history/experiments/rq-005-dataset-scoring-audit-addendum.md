@@ -1,7 +1,7 @@
 # RQ-005 — Dataset & Scoring Audit Addendum (commercial-servicing heading gap)
 
 **Type:** Read-only audit addendum. Supplementary to
-`docs/rq-005-dataset-scoring-audit.md` (which is preserved unchanged).
+`docs/history/experiments/rq-005-dataset-scoring-audit.md` (which is preserved unchanged).
 **Scope:** closes the Section 4/5 gap of the original audit — the heading/evidence
 verification of `examples/commercial-servicing-manual.md`.
 **No dataset, corpus, or scoring file was modified.**
@@ -65,7 +65,7 @@ cross-lingual power, bounded negative sampling) remain in force and are not chan
 
 **Read-only attestation:** this addendum read `examples/commercial-servicing-manual.md` and
 `evals/*.json` only. No dataset, corpus, or scoring file was written. The only artifact
-created is this addendum; `docs/rq-005-dataset-scoring-audit.md` is unchanged.
+created is this addendum; `docs/history/experiments/rq-005-dataset-scoring-audit.md` is unchanged.
 
 **Separation statement:** audit findings only; kept distinct from any improvement
 measurement; nothing here relaxes the `0.70` acceptance rule.

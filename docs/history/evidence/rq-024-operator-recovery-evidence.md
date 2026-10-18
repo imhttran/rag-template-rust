@@ -104,7 +104,7 @@ At every floor (0.50/0.60/0.70) and every chunk size (30/50/100), cross-lingual 
 | task | SOP state | actual deliverable | smallest supported reconciliation |
 | --- | --- | --- | --- |
 | RQ-002 | `LOCAL_DONE` (PASS) | only a harness script; **no results table**; script can't run under `rag_user` | amend RQ-002 to accept **operator-run** chunking results (this doc, Phase 3) and document the CREATE-DATABASE prerequisite; keep the script as tooling |
-| RQ-003 | `LOCAL_DONE` (**ALREADY_SATISFIED**, 0 mutations) | **no matrix** | point RQ-003's deliverable at `docs/rq-003-embedding-model-matrix.md` (operator-run) |
+| RQ-003 | `LOCAL_DONE` (**ALREADY_SATISFIED**, 0 mutations) | **no matrix** | point RQ-003's deliverable at `docs/history/experiments/rq-003-embedding-model-matrix.md` (operator-run) |
 | RQ-004 | **`CONTINUE`/INCOMPLETE** | production tooling + **synthetic** records | quarantine `evals/sweep-records/*`; decide retain/revert `ranking.go`/`sweep.go`/`hybrid.go`; accept the Phase-4 operator measurements as the deliverable |
 
 Apply each via `sop reconcile --accept-changed <id>` (with operator approval) or `sop retry`

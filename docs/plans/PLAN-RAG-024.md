@@ -53,7 +53,7 @@ before and after similarity filtering.
 > rewriting history: the original requirement and the later authorization are both recorded.
 
 ### Deliverables
-- **Create `docs/rq-001-baseline-failure-classification.md`** (a new, standalone report — not an
+- **Create `docs/history/experiments/rq-001-baseline-failure-classification.md`** (a new, standalone report — not an
   append to `docs/experiments-eval-sweep.md`). It must contain:
   - reconciled baseline metrics and their source evidence;
   - a per-case retrieval failure classification (one row per held-out case);
@@ -108,7 +108,7 @@ and evidence recall.
 - Validation: focused chunking tests pass; per-config eval output captured; `git diff`
   limited to experiment docs/config under test.
 - **Operator evidence required (reconciled 2026-10-12):** the deliverable is satisfied only by
-  the operator-run chunking metrics in `docs/rq-024-operator-recovery-evidence.md` (Phase 3):
+  the operator-run chunking metrics in `docs/history/evidence/rq-024-operator-recovery-evidence.md` (Phase 3):
   `CHUNK_SIZE` 30/50/100 → hybrid R@4 `0.48 / 0.52 / 0.48`, cross-lingual R@4 `0.00`. The SOP
   harness `scripts/chunk-sweep.sh` could not run under `rag_user` (no `CREATEDB`) and is tooling.
 
@@ -135,7 +135,7 @@ split (embedding-only comparison; `QUERY_REWRITE=false`).
 - No production default changed by this task (recommendation only).
 - Validation: sweep run on disposable DBs; results reconciled, historical rows untouched.
 - **Operator evidence required (reconciled 2026-10-12):** satisfied only by the operator-run
-  matrix in `docs/rq-003-embedding-model-matrix.md` (nomic vs embeddinggemma; both R@1/R@4
+  matrix in `docs/history/experiments/rq-003-embedding-model-matrix.md` (nomic vs embeddinggemma; both R@1/R@4
   `0.00` on all 10 cross-lingual cases; nomic overall R@4 `0.52` vs gemma `0.27`). SOP produced
   no matrix (it recorded `ALREADY_SATISFIED` with zero mutations).
 
@@ -148,7 +148,7 @@ Test ranking/candidate levers: vector-only vs keyword-only vs RRF; weighted RRF;
 sensitivity; `TOP_K`/`FINAL_K`/`EXPAND_LIMIT`.
 
 ### Deliverables
-- **Create `docs/rq-004-ranking-candidate-results.md`** (a new, standalone report). It must
+- **Create `docs/history/experiments/rq-004-ranking-candidate-results.md`** (a new, standalone report). It must
   contain: verified **operator-run** measurements; the frozen dataset and corpus hashes;
   the retrieval configurations; **floor sensitivity and rejection accuracy**; `TOP_K`
   sensitivity; **vector-only vs hybrid** comparison; **cross-lingual results**; reproduction
@@ -166,7 +166,7 @@ sensitivity; `TOP_K`/`FINAL_K`/`EXPAND_LIMIT`.
 - Any proposed change preserves section dedup/expansion semantics and citation behavior.
 - Validation: `internal/retrieval` unit + integration tests pass; sweep evidence captured.
 - **Operator evidence required (reconciled 2026-10-12):** satisfied only by the operator-run
-  comparisons in `docs/rq-024-operator-recovery-evidence.md` (Phase 4): floor sensitivity
+  comparisons in `docs/history/evidence/rq-024-operator-recovery-evidence.md` (Phase 4): floor sensitivity
   (R@4 `0.67` at `0.50`/`0.60` vs `0.52` at `0.70`; rejection `0.00`/`0.67`/`1.00`), candidate-pool
   (`TOP_K=8` → R@8 `0.52`, no gain), vector-only vs hybrid (identical at `0.70`), cross-lingual
   R@4 `0.00` at every floor. SOP's `evals/sweep-records/*` are **SYNTHETIC** (see
@@ -207,7 +207,7 @@ Consolidate RQ-002/003/004 against the RQ-005 audit and select the improvement t
 - A single comparison table (all candidate configurations × held-out metrics at floor
   `0.70`), plus a ranked recommendation with an explicit cost/risk note.
 - A decision record stating what is *measured improvement* vs *audit artifact*.
-- **Create or verify-and-annotate `docs/rq-006-decision-record.md`** (the RQ-006 deliverable; if
+- **Create or verify-and-annotate `docs/history/experiments/rq-006-decision-record.md`** (the RQ-006 deliverable; if
   it already exists, verify it against the captures and append a dated verification note — a
   repository mutation). It must contain: verified A/D1/D2 measurements; frozen dataset hashes
   and configuration; rejection and monolingual-regression results; query-cache provenance and
@@ -215,7 +215,7 @@ Consolidate RQ-002/003/004 against the RQ-005 audit and select the improvement t
   cross-lingual retrieval); and a ranked recommendation with limitations. **Reference captures
   by path; do NOT embed large file contents in model prompts** — an oversized request caused an
   Ollama HTTP 400 `request body too large` failure.
-- **Create `docs/rq-006-rejection-preserving-results.md`** (operator-run): the rejection
+- **Create `docs/history/experiments/rq-006-rejection-preserving-results.md`** (operator-run): the rejection
   diagnosis, the A–E arm matrix (≥3 repeats), the unanswerable failure cases, the measured
   trade-offs, and the acceptance table.
 
@@ -228,8 +228,8 @@ Consolidate RQ-002/003/004 against the RQ-005 audit and select the improvement t
 - No historical number rewritten; all baselines retained.
 - Validation: every recommendation traceable to a captured evidence row.
 - **Operator evidence (reconciled 2026-10-12):** the recommendation must be traceable to
-  `docs/rq-006-rejection-preserving-results.md` and
-  `docs/rq-006-deterministic-armD-validation.md`. Arms that lower rejection (bilingual expansion
+  `docs/history/experiments/rq-006-rejection-preserving-results.md` and
+  `docs/history/experiments/rq-006-deterministic-armD-validation.md`. Arms that lower rejection (bilingual expansion
   / translation alone, B/C) are **ineligible**; a candidate is eligible only if rejection stays
   `6/6` **and** cross-lingual R@4 rises above `0.00`. Under pinned decoding the eligible
   candidate is **D2** (baseline-first guard: rejection `6/6`, cross-lingual R@4 `0.00 → 0.10`,
@@ -247,7 +247,7 @@ Consolidate RQ-002/003/004 against the RQ-005 audit and select the improvement t
 findings as future backlog.
 
 ### Deliverables
-- **Create `docs/rq-007-deferred-bilingual-backlog.md`** recording: the **deferred** production
+- **Create `docs/plans/BACKLOG-RAG-007.md`** recording: the **deferred** production
   bilingual-retrieval decision; D2's measured result (rejection `6/6`, cross-lingual R@4
   `0.00 → 0.10`, single recovered case `eval-en-vi-02`, no monolingual R@1 regression); the
   unresolved `vi-en` direction; and the future-backlog items (a rejection-preserving cross-lingual
@@ -255,8 +255,8 @@ findings as future backlog.
 
 ### Acceptance Criteria
 - **No change** to `internal/retrieval`, `cmd/rag`, `cmd/eval` scoring, or any production default.
-- The backlog is traceable to the verified captures (`docs/rq-006-decision-record.md`,
-  `docs/rq-006-deterministic-armD-validation.md`).
+- The backlog is traceable to the verified captures (`docs/history/experiments/rq-006-decision-record.md`,
+  `docs/history/experiments/rq-006-deterministic-armD-validation.md`).
 - `go build ./...`, `go vet ./...`, `go test ./... -count=1`, `go test -race ./...` pass.
 - Validation: full gate set + `git diff --check`.
 

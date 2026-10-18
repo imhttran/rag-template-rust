@@ -82,8 +82,8 @@ monolingual R@1 cost; LLM decoding not pinned, so magnitude varies while rejecti
 - If the operator rejects the monolingual R@1 cost or cannot pin determinism, **no production
   change** is the alternative — the cross-lingual gain is not free.
 
-*Captures:* `docs/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/rq-006-diag-armA.txt`,
-`docs/rq-006-diag-armC.txt`, `docs/rq-006-operator-arm{A,B,C}-*.txt`.
+*Captures:* `docs/history/experiments/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/history/experiments/rq-006-diag-armA.txt`,
+`docs/history/experiments/rq-006-diag-armC.txt`, `docs/rq-006-operator-arm{A,B,C}-*.txt`.
 *Operator-measured; frozen inputs, the `0.70` threshold, and RAG-023 records are unchanged.*
 
 ---
@@ -93,7 +93,7 @@ monolingual R@1 cost; LLM decoding not pinned, so magnitude varies while rejecti
 *Added 2026-10-12. This section adds framing/eligibility text only. **Every previously
 recorded number in §§1–6 above is unchanged;** the A–E matrix (§2), the failure-case table
 (§3), the trade-off table (§4), the Phase-4 acceptance rows (§5), and the recommendation
-(§6) are preserved verbatim. The raw per-case rows are `docs/rq-006-rejection-arm-matrix.txt`
+(§6) are preserved verbatim. The raw per-case rows are `docs/history/experiments/rq-006-rejection-arm-matrix.txt`
 (A–E × 3 repeats).*
 
 ### 7.1 Eligibility rule (verbatim)
@@ -106,10 +106,10 @@ recorded number in §§1–6 above is unchanged;** the A–E matrix (§2), the f
 
 - **Arm B (bilingual expansion) is INELIGIBLE** — it lowers rejection to `0–1/6` (§2, §4).
   In the raw matrix every `arm=B` unanswerable row is `FALSE_POSITIVE`
-  (`docs/rq-006-rejection-arm-matrix.txt`, `arm=B rep=1..3 eval-unanswerable-01..06`).
+  (`docs/history/experiments/rq-006-rejection-arm-matrix.txt`, `arm=B rep=1..3 eval-unanswerable-01..06`).
 - **Arm C (translation alone) is INELIGIBLE** — it lowers rejection to `0–1/6` (§2, §4).
   In the raw matrix nearly every `arm=C` unanswerable row is `FALSE_POSITIVE`
-  (`docs/rq-006-rejection-arm-matrix.txt`, `arm=C rep=1..3 eval-unanswerable-01..06`).
+  (`docs/history/experiments/rq-006-rejection-arm-matrix.txt`, `arm=C rep=1..3 eval-unanswerable-01..06`).
 
 Their cross-lingual R@4 gain (`0.20–0.40`) is therefore **candidate recall on sections that
 should never have been surfaced**, not an answerability gain.
@@ -118,7 +118,7 @@ should never have been surfaced**, not an answerability gain.
 
 Under the **pinned-decoding** re-run (`temperature=0, seed=0, num_predict=64`; query cache
 `docs/rq-006-query-cache.json`), the arm-D guard was split into two variants. The
-**eligible candidate is D2**, documented in `docs/rq-006-deterministic-armD-validation.md`:
+**eligible candidate is D2**, documented in `docs/history/experiments/rq-006-deterministic-armD-validation.md`:
 
 - **D2** pins the original query's top-1 at rank 1 and fills ranks 2–4 from the fused
   translated ranking, keeping the original-query rejection guard.
@@ -126,11 +126,11 @@ Under the **pinned-decoding** re-run (`temperature=0, seed=0, num_predict=64`; q
   monolingual regression** (`vi-vi R@1` unchanged `0.80`, `en-en R@1` unchanged `0.50`);
   **zero variance across 3 repeats**.
 - D1 (guard + full fusion) is **eligible but not selected**: it regresses `en-en` R@1
-  `0.50 → 0.40` (`docs/rq-006-deterministic-armD-validation.md`).
+  `0.50 → 0.40` (`docs/history/experiments/rq-006-deterministic-armD-validation.md`).
 
-Source of the eligible-candidate evidence: **`docs/rq-006-deterministic-armD-validation.md`**
+Source of the eligible-candidate evidence: **`docs/history/experiments/rq-006-deterministic-armD-validation.md`**
 (§Phase 1 determinism; §Phase 2/3 A/D1/D2 matrix; §Phase 4 acceptance) and the raw rows in
-`docs/rq-006-deterministic-matrix.txt` (A/D1/D2 × 3).
+`docs/history/experiments/rq-006-deterministic-matrix.txt` (A/D1/D2 × 3).
 
 ### 7.4 Acceptance table — D2 as the single eligible candidate (pinned decoding)
 
@@ -149,6 +149,6 @@ complexity, **no change** remains the documented alternative (§6). **RQ-006 mak
 production retrieval change** (RQ-007 concern).
 
 *Traceability:* every claim above is traceable to a captured evidence row —
-`docs/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/rq-006-deterministic-matrix.txt`
-(A/D1/D2 × 3), and `docs/rq-006-deterministic-armD-validation.md`. The consolidated decision
-record is `docs/rq-006-decision-record.md`.
+`docs/history/experiments/rq-006-rejection-arm-matrix.txt` (A–E × 3), `docs/history/experiments/rq-006-deterministic-matrix.txt`
+(A/D1/D2 × 3), and `docs/history/experiments/rq-006-deterministic-armD-validation.md`. The consolidated decision
+record is `docs/history/experiments/rq-006-decision-record.md`.

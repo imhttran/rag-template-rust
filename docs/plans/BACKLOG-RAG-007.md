@@ -66,17 +66,17 @@ that the ranking-side guard cannot fix.
 
 This backlog is traceable to the verified RQ-006 captures:
 
-- `docs/rq-006-decision-record.md` — decision (defer production integration; preserve findings
+- `docs/history/experiments/rq-006-decision-record.md` — decision (defer production integration; preserve findings
   as future backlog: a rejection-preserving cross-lingual strategy and an authorized
   multilingual embedding model for the unresolved `vi-en` direction); D2 row (overall R@1 0.42,
   R@4 0.55, rejection 6/6, cross-ling R@4 0.10, en-vi R@4 0.20, vi-en R@4 0.00, vi-vi R@1 0.80,
   en-en R@1 0.50); recovered case `eval-en-vi-02`; unresolved `vi-en` embed miss.
-- `docs/rq-006-deterministic-armD-validation.md` — Phase 4 acceptance table (D2 qualifies on
+- `docs/history/experiments/rq-006-deterministic-armD-validation.md` — Phase 4 acceptance table (D2 qualifies on
   all five criteria: rejection 6/6; cross-lingual R@4 0.00 → 0.10; monolingual R@1 no regression
   vi-vi 0.80 / en-en 0.50; zero variance across 3 reps; ~+17 s / 39-case pass); "`vi-en` remains
   `0.00` in every arm".
 
 Every number recorded above is found in one of those two captures (or the RQ-006 captures they
-cite: `docs/rq-006-rejection-preserving-results.md`, `docs/rq-006-deterministic-matrix.txt`,
-`docs/rq-006-diag-armD2.txt`); no new or contradictory number is introduced. The design
-context for the arms is `docs/rq-006-bilingual-retrieval-experiment-design.md`.
+cite: `docs/history/experiments/rq-006-rejection-preserving-results.md`, `docs/history/experiments/rq-006-deterministic-matrix.txt`,
+`docs/history/experiments/rq-006-diag-armD2.txt`); no new or contradictory number is introduced. The design
+context for the arms is `docs/history/experiments/rq-006-bilingual-retrieval-experiment-design.md`.
