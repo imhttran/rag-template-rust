@@ -12,20 +12,21 @@
 # Each step runs in order and the commit is aborted if any of them fails.
 set -e
 
-echo "pre-commit: go mod tidy"
-go mod tidy
+# Load the repository .env (if present) so database checks get DATABASE_URL
+# without repeated manual exports. Values are never printed.
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
-echo "pre-commit: go fmt ./..."
-go fmt ./...
+# Read-only formatting/module checks: hooks must never modify source files.
+# `go mod tidy -diff` and `gofmt -l` report what would change and exit non-zero
+# instead of rewriting.
+echo "pre-commit: go mod tidy -diff"
+go mod tidy -diff
 
-# `go mod tidy` and `go fmt` rewrite files in place. If they modified a file
-# that is part of this commit, the commit would silently miss the fix, so stop
-# and ask for the files to be staged.
-staged=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go' 'go.mod' 'go.sum')
-if [ -n "$staged" ] && ! git diff --quiet -- $staged; then
-	echo "pre-commit: go mod tidy / go fmt changed files in this commit."
-	echo "Stage them and commit again:"
-	git --no-pager diff --name-only -- $staged
+echo "pre-commit: gofmt -l . (read-only formatting check)"
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then
+	echo "pre-commit: these files are not gofmt-formatted:" >&2
+	printf '%s\n' "$unformatted" >&2
 	exit 1
 fi
 
@@ -59,8 +60,11 @@ staticcheck ./...
 # tool that may not be installed, so it is skipped with an actionable hint rather
 # than failing the commit when it is absent.
 if command -v govulncheck >/dev/null 2>&1; then
-	echo "pre-commit: govulncheck ./..."
-	govulncheck ./...
+	# Scan with the patched stdlib toolchain (GO-2026-6617/6613 are fixed only in
+	# go1.27.2). The rest of the hook keeps the default toolchain so the prebuilt
+	# staticcheck (older export-data reader) still works.
+	echo "pre-commit: govulncheck ./... (GOTOOLCHAIN=go1.27.2)"
+	GOTOOLCHAIN=go1.27.2 govulncheck ./...
 else
 	echo "pre-commit: govulncheck not found, skipping the vulnerability scan"
 	echo "           install it with: go install golang.org/x/vuln/cmd/govulncheck@latest"
@@ -71,5 +75,16 @@ go test ./...
 
 echo "pre-commit: go build ./..."
 go build ./...
+
+# Rust and web checks. Go stays in the repository until RUST-007; the Go checks
+# above remain. The Makefile targets are the single source of truth.
+echo "pre-commit: make rust-fmt"
+make rust-fmt
+
+echo "pre-commit: make web-check-env"
+make web-check-env
+
+echo "pre-commit: make web-typecheck"
+make web-typecheck
 
 echo "pre-commit: ok"

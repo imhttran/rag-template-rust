@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep
+.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
 # Convenience targets for the ingest/query workflow.
 #
 #   make db-up        start PostgreSQL and apply the schema
@@ -10,6 +10,9 @@
 #   make ask Q="…"    ask a question (omit Q to be prompted)
 #   make eval         score retrieval against evals/retrieval.json
 #   make sweep        compare eval metrics across settings
+#   make web-start    start the Next.js prototype on 127.0.0.1:3000 (background)
+#   make web-stop     stop the prototype started by make web-start
+#   make web-status   report the prototype's state, URL, and log path
 #
 # Override inputs on the command line, e.g.
 #   make ingest FILE=examples/other.md
@@ -76,3 +79,53 @@ db-schema:
 	@for f in migrations/*.sql; do \
 		psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
 	done
+
+# ---- Web UI prototype (Next.js, UI-002) ----------------------------------------
+# Manage the local prototype on 127.0.0.1:3000. PID and log live under web/.run/
+# (git-ignored). Node/npm are found on PATH or via the Zed-bundled installation;
+# override with NODE_BIN=... / NPM_BIN=... The prototype serves mock data only.
+web-start:
+	./scripts/web-control.sh start
+
+web-stop:
+	./scripts/web-control.sh stop
+
+web-status:
+	./scripts/web-control.sh status
+
+# Resolve and validate the Node/npm toolchain (overrides -> PATH -> Zed bundled).
+web-check-env:
+	./scripts/web-control.sh check-env
+
+# Install web dependencies with the resolved toolchain.
+web-install:
+	./scripts/web-control.sh install
+
+# ---- Rust checks (the port under rust/) ----------------------------------------
+# Reused by .githooks so the hooks and the Makefile never diverge. The Rust
+# package still lives at rust/ until RUST-007 moves it to the root.
+rust-fmt:
+	cargo fmt --manifest-path rust/Cargo.toml --check
+
+rust-build:
+	cargo build --locked --manifest-path rust/Cargo.toml
+
+rust-test:
+	cargo test --locked --manifest-path rust/Cargo.toml
+
+rust-clippy:
+	cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
+
+rust-check: rust-fmt rust-build rust-test rust-clippy
+
+# ---- Web checks (the Next.js prototype under web/) -----------------------------
+web-typecheck:
+	./scripts/web-control.sh typecheck
+
+web-build:
+	./scripts/web-control.sh build
+
+web-check: web-typecheck web-build
+
+# Everything: the Go reference unit tests, the Rust checks, and the web checks.
+check: test rust-check web-check
