@@ -231,7 +231,10 @@ func Strip(answer string, documents []retrieval.Document) (string, int) {
 
 		builder.WriteString(prefix)
 
-		if needsSeparator(prefix, suffix) {
+		// Check the text written so far, not just this span's prefix: adjacent
+		// invalid citations leave an empty prefix, and using it alone would join
+		// "foo" + "bar" into "foobar" across the second citation.
+		if needsSeparator(builder.String(), suffix) {
 			builder.WriteString(" ")
 		}
 

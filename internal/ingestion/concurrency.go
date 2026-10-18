@@ -75,6 +75,14 @@ func mapOrdered[T any, R any](
 		return nil, firstErr
 	}
 
+	// A context can be canceled before any goroutine starts or after a successful
+	// call but before every input is scheduled. The loop then skips the remaining
+	// inputs, leaving their result slots at the zero value. Report the cancellation
+	// instead of returning a short/partial result set as success.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	return results, nil
 }
 

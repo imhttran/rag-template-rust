@@ -2,6 +2,7 @@ package ingestion
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -89,6 +90,31 @@ func TestMapOrderedPropagatesFirstError(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected an error")
+	}
+}
+
+// TestMapOrderedReturnsCanceledContext verifies that a context canceled before
+// any work is scheduled is reported as an error, not as a successful result set
+// whose slots still hold zero values.
+func TestMapOrderedReturnsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	results, err := mapOrdered(
+		ctx,
+		[]int{0, 1, 2},
+		2,
+		func(_ context.Context, _ int, input int) (int, error) {
+			return input, nil
+		},
+	)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+
+	if results != nil {
+		t.Fatalf("results = %v, want nil on cancellation", results)
 	}
 }
 

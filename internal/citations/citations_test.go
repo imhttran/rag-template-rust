@@ -113,6 +113,12 @@ func TestStrip(t *testing.T) {
 			stripped: 1,
 		},
 		{
+			name:     "adjacent invalid citations do not join words",
+			answer:   "foo[b.md - X][c.md - Y]bar",
+			want:     "foo bar",
+			stripped: 2,
+		},
+		{
 			name:     "citation already bounded by punctuation needs no separator",
 			answer:   "foo.[b.md - X].bar",
 			want:     "foo..bar",

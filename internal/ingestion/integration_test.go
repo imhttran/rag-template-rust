@@ -488,9 +488,8 @@ func TestReplaceDocumentIntegrationRetryExhaustionPreservesDocument(t *testing.T
 
 // TestIsUpToDateIntegrationZeroDimension is the regression guard for the
 // provenance lookup when no embedding dimension is pinned (the case the ingest
-// CLI uses). With no dimension the query's FILTER is TRUE and there is no $5, so
-// the bind must supply four arguments; before the fix this failed with
-// "expected 4 arguments, got 5" and made every ingest error out.
+// CLI uses). With no dimension the query has no $7, so the bind must supply six
+// arguments; before this fix it supplied five and made every ingest error out.
 func TestIsUpToDateIntegrationZeroDimension(t *testing.T) {
 	ctx := context.Background()
 	requireDatabase(t)
@@ -534,7 +533,69 @@ func TestIsUpToDateIntegrationZeroDimension(t *testing.T) {
 	}
 }
 
-// TestIsUpToDateIntegrationPinnedDimension exercises the $5 branch: a pinned
+// TestIsUpToDateIntegrationLanguageAndCorpus guards the metadata columns that
+// must invalidate an otherwise unchanged document. The ingest CLI reads both
+// from the environment, so re-running it with a new RAG_CORPUS or
+// CORPUS_LANGUAGE must replace the rows rather than skip them.
+func TestIsUpToDateIntegrationLanguageAndCorpus(t *testing.T) {
+	ctx := context.Background()
+	requireDatabase(t)
+
+	resetTestDocument(t, ctx)
+
+	ingester := newIngester(t)
+
+	provenance := Provenance{
+		ContentHash:   "hash-1",
+		EmbedModel:    "fake",
+		Dimension:     embeddingDim,
+		ChunkerConfig: "size=50,overlap=20",
+		Language:      "en",
+		Corpus:        "corpus-a",
+		IngestedAt:    time.Now().UTC(),
+	}
+
+	if err := ingester.ReplaceDocumentWithProvenance(ctx, testSource, []chunking.Chunk{
+		{Section: "Fees", Index: 0, Content: "first chunk"},
+	}, provenance); err != nil {
+		t.Fatalf("seed replace: %v", err)
+	}
+
+	upToDate, err := ingester.IsUpToDate(ctx, testSource, provenance)
+	if err != nil {
+		t.Fatalf("IsUpToDate (unchanged): %v", err)
+	}
+
+	if !upToDate {
+		t.Fatal("unchanged document reported not up to date")
+	}
+
+	for _, test := range []struct {
+		name   string
+		change func(*Provenance)
+	}{
+		{name: "language", change: func(p *Provenance) { p.Language = "de" }},
+		{name: "corpus", change: func(p *Provenance) { p.Corpus = "corpus-b" }},
+		{name: "unset language", change: func(p *Provenance) { p.Language = "" }},
+		{name: "unset corpus", change: func(p *Provenance) { p.Corpus = "" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := provenance
+			test.change(&changed)
+
+			upToDate, err := ingester.IsUpToDate(ctx, testSource, changed)
+			if err != nil {
+				t.Fatalf("IsUpToDate (%s): %v", test.name, err)
+			}
+
+			if upToDate {
+				t.Fatalf("%s change reported up to date", test.name)
+			}
+		})
+	}
+}
+
+// TestIsUpToDateIntegrationPinnedDimension exercises the $7 branch: a pinned
 // dimension is compared, so a document stored at a different width is not up to
 // date.
 func TestIsUpToDateIntegrationPinnedDimension(t *testing.T) {
