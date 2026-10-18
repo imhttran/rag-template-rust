@@ -33,6 +33,10 @@
 
 set -e
 
+# Load the repository .env (if present) so database checks get DATABASE_URL
+# without repeated manual exports. Values are never printed.
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
+
 test_url="${RAG_TEST_DATABASE_URL:-postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable}"
 
 integration_test_agent="${INTEGRATION_TEST_AGENT:-.agents/scripts/integration-test-agent.sh}"

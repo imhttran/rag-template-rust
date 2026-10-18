@@ -12,6 +12,10 @@
 # Each step runs in order and the commit is aborted if any of them fails.
 set -e
 
+# Load the repository .env (if present) so database checks get DATABASE_URL
+# without repeated manual exports. Values are never printed.
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
+
 # Read-only formatting/module checks: hooks must never modify source files.
 # `go mod tidy -diff` and `gofmt -l` report what would change and exit non-zero
 # instead of rewriting.

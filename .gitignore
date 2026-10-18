@@ -1,6 +1,7 @@
 # Compiled binaries from cmd/rag and cmd/ingest
 /rag
 /ingest
+/interop
 
 # Go build and test artifacts
 *.exe
@@ -17,6 +18,7 @@ target/
 .env
 .env.*
 !.env.example
+*.Local.*
 
 # Editor and OS files
 .DS_Store

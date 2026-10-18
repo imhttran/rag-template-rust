@@ -105,16 +105,16 @@ web-install:
 # Reused by .githooks so the hooks and the Makefile never diverge. The Rust
 # package still lives at rust/ until RUST-007 moves it to the root.
 rust-fmt:
-	cd rust && cargo fmt --check
+	cargo fmt --manifest-path rust/Cargo.toml --check
 
 rust-build:
-	cd rust && cargo build --locked
+	cargo build --locked --manifest-path rust/Cargo.toml
 
 rust-test:
-	cd rust && cargo test --locked
+	cargo test --locked --manifest-path rust/Cargo.toml
 
 rust-clippy:
-	cd rust && cargo clippy --locked --all-targets -- -D warnings
+	cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
 
 rust-check: rust-fmt rust-build rust-test rust-clippy
 
