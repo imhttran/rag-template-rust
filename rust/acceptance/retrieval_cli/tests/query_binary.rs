@@ -33,11 +33,11 @@ fn production_query_returns_cited_source_and_page() {
         "answer text missing; stdout:\n{stdout}"
     );
     assert!(
-        stdout.contains(&format!("[{source}, page 2]")),
+        stdout.contains(&format!("[{source} - Intro - p.2]")),
         "cited source/page missing; stdout:\n{stdout}"
     );
     assert!(
-        stdout.contains(&format!("source: {source}, page 2")),
+        stdout.contains(&format!("source: {source} - Intro - p.2")),
         "rendered page reference missing; stdout:\n{stdout}"
     );
     assert_eq!(

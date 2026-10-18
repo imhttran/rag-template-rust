@@ -77,15 +77,15 @@ fn candidate(source: &str, page: u32, content: &str) -> Candidate {
 fn cited_source_and_page_metadata_are_returned() {
     let source = "acceptance-doc.md";
     let retrieval = FixedRetrieval::new(vec![candidate(source, 2, "the answer is 42")]);
-    let generator = StubGenerator::new("It is 42 [acceptance-doc.md, page 2].");
+    let generator = StubGenerator::new("It is 42 [acceptance-doc.md - Intro - p.2].");
     let service = AnswerService::new(&retrieval, &generator, 1000);
 
     let answer = service.answer("what is the answer?").unwrap();
     assert!(!answer.refused);
-    assert!(answer.text.contains("[acceptance-doc.md, page 2]"));
+    assert!(answer.text.contains("[acceptance-doc.md - Intro - p.2]"));
     assert_eq!(
         answer.references,
-        vec!["acceptance-doc.md, page 2".to_string()]
+        vec!["acceptance-doc.md - Intro - p.2".to_string()]
     );
     assert_eq!(generator.calls(), 1);
 }
@@ -93,13 +93,14 @@ fn cited_source_and_page_metadata_are_returned() {
 #[test]
 fn invalid_citations_are_dropped() {
     let retrieval = FixedRetrieval::new(vec![candidate("acceptance-doc.md", 2, "body")]);
-    let generator =
-        StubGenerator::new("Fact [acceptance-doc.md, page 2] bogus [acceptance-doc.md, page 9].");
+    let generator = StubGenerator::new(
+        "Fact [acceptance-doc.md - Intro - p.2] bogus [acceptance-doc.md - Intro - p.9].",
+    );
     let service = AnswerService::new(&retrieval, &generator, 1000);
 
     let answer = service.answer("what?").unwrap();
-    assert!(answer.text.contains("[acceptance-doc.md, page 2]"));
-    assert!(!answer.text.contains("page 9"));
+    assert!(answer.text.contains("[acceptance-doc.md - Intro - p.2]"));
+    assert!(!answer.text.contains("p.9"));
 }
 
 #[test]

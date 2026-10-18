@@ -201,7 +201,7 @@ fn serve(stream: &mut TcpStream, source: &str, fail_generate: bool) {
         ),
         "/api/generate" => (
             200,
-            format!("{{\"response\":\"The answer is 42 [{source}, page 2].\"}}"),
+            format!("{{\"response\":\"The answer is 42 [{source} - Intro - p.2].\"}}"),
         ),
         _ => (404, "{}".to_string()),
     };

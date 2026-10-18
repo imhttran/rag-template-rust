@@ -636,7 +636,7 @@ pub fn guard_source(corpus: &str, class: InputClass) -> String {
 
 /// The fixed answer the mocked model returns. It cites the corpus page.
 pub const MOCKED_ANSWER: &str =
-    "PostgreSQL with the pgvector extension stores the vectors [rust/fixtures/parity/inputs/text-layer.pdf, page 1].";
+    "PostgreSQL with the pgvector extension stores the vectors [rust/fixtures/parity/inputs/text-layer.pdf - Page 1 - p.1].";
 
 fn compare<T: PartialEq + std::fmt::Debug>(
     checks: &mut Vec<String>,

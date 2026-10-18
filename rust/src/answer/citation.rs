@@ -1,113 +1,147 @@
-//! Citation parsing, validation and repair.
+//! Citation parsing, validation, and repair.
 //!
-//! Ported from the Go baseline citation rules. Citations use the form
-//! `[page N]` or `[source, page N]`. Parsing extracts citations from a model
-//! answer; validation checks them against the retrieved evidence; repair drops
-//! citations that reference evidence not present in the context.
+//! Ported from the Go baseline (`internal/citations`). Citations use the form
+//! `[source - section]` or `[source - section - p.N]`; parsing is lexical, and
+//! repair strips only citations that do not resolve to the retrieved passages.
 
 use super::context_budget::ContextPassage;
 
-/// A parsed citation.
+/// A parsed `[source - section]` citation with an optional page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Citation {
-    /// Optional source document name.
-    pub source: Option<String>,
-    /// Optional 1-based page number.
+    /// Source document name.
+    pub source: String,
+    /// Section title.
+    pub section: String,
+    /// Optional 1-based page.
     pub page: Option<u32>,
-    /// The raw matched text, e.g. `[page 3]`.
-    pub raw: String,
 }
 
-/// Parses all citations from `answer` in order of appearance.
-///
-/// Recognises `[page N]`, `[source, page N]`, and `[source]` forms.
-pub fn parse(answer: &str) -> Vec<Citation> {
-    let mut citations = Vec::new();
-    let mut rest = answer;
-    while let Some(open) = rest.find('[') {
-        let after_open = &rest[open..];
-        let Some(close) = after_open.find(']') else {
-            break;
-        };
-        let raw = &after_open[..=close];
-        if let Some(citation) = parse_one(raw) {
-            citations.push(citation);
-        }
-        rest = &after_open[close + 1..];
-    }
-    citations
+/// A citation together with its byte span in the parsed answer.
+struct Span {
+    citation: Citation,
+    start: usize,
+    end: usize,
 }
 
-fn parse_one(raw: &str) -> Option<Citation> {
+/// Normalizes en/em dashes so a citation can be split on a single separator.
+fn normalize(citation: &str) -> String {
+    citation.replace(['\u{2013}', '\u{2014}'], "-")
+}
+
+/// Normalizes a source for comparison: trim, lowercase, and drop a trailing
+/// `.md` suffix, matching the Go baseline.
+fn normalize_source(source: &str) -> String {
+    let trimmed = source.trim().to_lowercase();
+    trimmed.strip_suffix(".md").unwrap_or(&trimmed).to_string()
+}
+
+fn parse_page_segment(segment: &str) -> Option<u32> {
+    let digits = segment.trim().strip_prefix("p.")?;
+    let page = digits.trim().parse::<u32>().ok()?;
+    (page > 0).then_some(page)
+}
+
+fn parse_inner(raw: &str) -> Option<Citation> {
     let inner = raw.strip_prefix('[')?.strip_suffix(']')?.trim();
-    let lower = inner.to_lowercase();
-    if let Some(rest) = lower.strip_prefix("page ") {
-        let page = rest.trim().parse::<u32>().ok()?;
-        return Some(Citation {
-            source: None,
-            page: Some(page),
-            raw: raw.to_string(),
-        });
-    }
-    if let Some((source, rest)) = inner.split_once(',') {
-        let rest_lower = rest.trim().to_lowercase();
-        if let Some(page_str) = rest_lower.strip_prefix("page ") {
-            let page = page_str.trim().parse::<u32>().ok()?;
-            return Some(Citation {
-                source: Some(source.trim().to_string()),
-                page: Some(page),
-                raw: raw.to_string(),
-            });
+    let normalized = normalize(inner);
+    let (source, rest) = normalized.split_once(" - ")?;
+    let mut citation = Citation {
+        source: source.trim().to_string(),
+        section: rest.trim().to_string(),
+        page: None,
+    };
+    if let Some((section, page_segment)) = rest.split_once(" - ") {
+        if let Some(page) = parse_page_segment(page_segment) {
+            citation.section = section.trim().to_string();
+            citation.page = Some(page);
         }
     }
-    if !inner.is_empty() && inner.split_whitespace().count() == 1 {
-        return Some(Citation {
-            source: Some(inner.to_string()),
-            page: None,
-            raw: raw.to_string(),
-        });
-    }
-    None
+    Some(citation)
 }
 
-/// Returns `true` when `citation` matches some passage in `passages`.
-pub fn is_valid(citation: &Citation, passages: &[ContextPassage]) -> bool {
-    passages.iter().any(|p| {
-        let source_ok = citation
-            .source
-            .as_ref()
-            .map(|s| s == &p.source)
-            .unwrap_or(true);
-        let page_ok = citation.page.map(|pg| Some(pg) == p.page).unwrap_or(true);
-        source_ok && page_ok
-    })
-}
-
-/// Repairs `answer` by dropping invalid citations.
-///
-/// Each bracketed citation that does not validate against `passages` is
-/// removed from the text. Valid citations are kept verbatim; non-citation text
-/// is preserved.
-pub fn repair(answer: &str, passages: &[ContextPassage]) -> String {
-    let mut out = String::new();
+fn spans(answer: &str) -> Vec<Span> {
+    let mut spans = Vec::new();
+    let bytes = answer.as_bytes();
     let mut i = 0;
-    while i < answer.len() {
-        if answer.as_bytes()[i] == b'[' {
+    while i < bytes.len() {
+        if bytes[i] == b'[' {
             if let Some(close) = answer[i..].find(']') {
-                let raw = &answer[i..=i + close];
-                if let Some(citation) = parse_one(raw) {
-                    if is_valid(&citation, passages) {
-                        out.push_str(raw);
-                    }
-                    i += close + 1;
-                    continue;
+                let end = i + close + 1;
+                if let Some(citation) = parse_inner(&answer[i..end]) {
+                    spans.push(Span {
+                        citation,
+                        start: i,
+                        end,
+                    });
                 }
+                i = end;
+                continue;
             }
         }
-        let ch = answer[i..].chars().next().unwrap();
-        out.push(ch);
-        i += ch.len_utf8();
+        i += answer[i..].chars().next().map(char::len_utf8).unwrap_or(1);
     }
+    spans
+}
+
+/// Parses all citations from `answer`, in order.
+pub fn parse(answer: &str) -> Vec<Citation> {
+    spans(answer)
+        .into_iter()
+        .map(|span| span.citation)
+        .collect()
+}
+
+/// Reports whether `citation` resolves to `passage`: normalized source, exact
+/// section, and, when the citation claims a page, the same page.
+pub fn matches(citation: &Citation, passage: &ContextPassage) -> bool {
+    if normalize_source(&passage.source) != normalize_source(&citation.source) {
+        return false;
+    }
+    if passage.section != citation.section {
+        return false;
+    }
+    match citation.page {
+        None => true,
+        Some(page) => passage.page == Some(page),
+    }
+}
+
+/// Returns true when `citation` matches any retrieved passage.
+pub fn is_valid(citation: &Citation, passages: &[ContextPassage]) -> bool {
+    passages.iter().any(|passage| matches(citation, passage))
+}
+
+fn needs_separator(prefix: &str, suffix: &str) -> bool {
+    if prefix.is_empty() || suffix.is_empty() {
+        return false;
+    }
+    let last = prefix.chars().last().unwrap();
+    let first = suffix.chars().next().unwrap();
+    last.is_alphanumeric() && first.is_alphanumeric()
+}
+
+/// Removes every citation that does not resolve to a retrieved passage,
+/// preserving valid citations and all prose. A separating space is inserted
+/// when removal would fuse two words.
+pub fn repair(answer: &str, passages: &[ContextPassage]) -> String {
+    let spans = spans(answer);
+    if spans.is_empty() {
+        return answer.to_string();
+    }
+    let mut out = String::new();
+    let mut cursor = 0;
+    for span in spans {
+        if is_valid(&span.citation, passages) {
+            continue;
+        }
+        out.push_str(&answer[cursor..span.start]);
+        if needs_separator(&out, &answer[span.end..]) {
+            out.push(' ');
+        }
+        cursor = span.end;
+    }
+    out.push_str(&answer[cursor..]);
     out
 }
 
@@ -115,50 +149,51 @@ pub fn repair(answer: &str, passages: &[ContextPassage]) -> String {
 mod tests {
     use super::*;
 
-    fn passage(source: &str, page: Option<u32>) -> ContextPassage {
+    fn passage(source: &str, section: &str, page: Option<u32>) -> ContextPassage {
         ContextPassage {
             source: source.to_string(),
-            section: "S".to_string(),
+            section: section.to_string(),
             page,
             content: "body".to_string(),
         }
     }
 
     #[test]
-    fn parses_page_citation() {
-        let c = parse("see [page 3].");
-        assert_eq!(c.len(), 1);
-        assert_eq!(c[0].page, Some(3));
-        assert_eq!(c[0].source, None);
+    fn parses_source_section() {
+        let parsed = parse("See [doc.md - Payments].");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].source, "doc.md");
+        assert_eq!(parsed[0].section, "Payments");
+        assert_eq!(parsed[0].page, None);
     }
 
     #[test]
-    fn parses_source_and_page_citation() {
-        let c = parse("[doc.md, page 2]");
-        assert_eq!(c[0].source.as_deref(), Some("doc.md"));
-        assert_eq!(c[0].page, Some(2));
+    fn parses_source_section_page() {
+        let parsed = parse("[doc.md - Payments - p.2]");
+        assert_eq!(parsed[0].section, "Payments");
+        assert_eq!(parsed[0].page, Some(2));
     }
 
     #[test]
-    fn validates_against_passages() {
-        let passages = vec![passage("doc.md", Some(2))];
-        let valid = parse("[doc.md, page 2]");
-        let invalid = parse("[doc.md, page 9]");
-        assert!(is_valid(&valid[0], &passages));
-        assert!(!is_valid(&invalid[0], &passages));
+    fn section_with_dash_is_preserved() {
+        let parsed = parse("[doc.md - Late Payments - Grace Period]");
+        assert_eq!(parsed[0].section, "Late Payments - Grace Period");
+        assert_eq!(parsed[0].page, None);
     }
 
     #[test]
-    fn repair_drops_invalid_citations() {
-        let passages = vec![passage("doc.md", Some(2))];
-        let answer = "Fact [doc.md, page 2] and bogus [doc.md, page 9].";
-        let repaired = repair(answer, &passages);
-        assert!(repaired.contains("[doc.md, page 2]"));
-        assert!(!repaired.contains("[doc.md, page 9]"));
+    fn validates_source_section_and_page() {
+        let passages = vec![passage("doc.md", "Payments", Some(2))];
+        assert!(is_valid(&parse("[doc.md - Payments]")[0], &passages));
+        assert!(is_valid(&parse("[doc.md - Payments - p.2]")[0], &passages));
+        assert!(!is_valid(&parse("[doc.md - Payments - p.9]")[0], &passages));
+        assert!(!is_valid(&parse("[other.md - Payments]")[0], &passages));
     }
 
     #[test]
-    fn plain_text_without_citations_is_unchanged_by_parse() {
-        assert!(parse("no citations here").is_empty());
+    fn repair_drops_only_invalid_citations() {
+        let passages = vec![passage("doc.md", "Payments", Some(2))];
+        let answer = "A [doc.md - Payments] B [doc.md - Other] C";
+        assert_eq!(repair(answer, &passages), "A [doc.md - Payments] B  C");
     }
 }

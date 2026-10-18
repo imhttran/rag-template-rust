@@ -38,13 +38,13 @@ fn real_ingest_query_and_cited_answer_match_the_frozen_baseline() {
     assert!(
         observed
             .answer
-            .contains("[rust/fixtures/parity/inputs/text-layer.pdf, page 1]"),
+            .contains("[rust/fixtures/parity/inputs/text-layer.pdf - Page 1 - p.1]"),
         "the answer must cite the corpus source and page: {}",
         observed.answer
     );
     assert_eq!(
         observed.references,
-        vec!["rust/fixtures/parity/inputs/text-layer.pdf, page 1".to_string()]
+        vec!["rust/fixtures/parity/inputs/text-layer.pdf - Page 1 - p.1".to_string()]
     );
     assert_eq!(
         observed.rejections.len(),

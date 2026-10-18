@@ -151,7 +151,7 @@ already present.
 | Query cache load/save in the Go format | MISSING | — | bilingual module (`QueryCache`, `go_json_string`) |
 | recall@k at explicit k, evidence recall | MISSING | `evaluation.rs` exposes only `score_sections` / `score_ranking` | bilingual module |
 | Go duration rendering for `wall` | MISSING | — | bilingual module (`go_duration_ms`) |
-| Live Ollama serving `nomic-embed-text` and `llama3.2:3b` | UNKNOWN (informational, non-gating) | resolved only by the live run in `RUST-007D-live-model-evidence.md` | — |
+| Live Ollama serving `nomic-embed-text` and `llama3.2:3b` | EXISTS | live run recorded in `RUST-007D-live-model-evidence.md` and `live-007d/` | — |
 
 ## 3. Divergences and assumptions
 

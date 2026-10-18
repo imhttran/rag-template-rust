@@ -126,23 +126,11 @@ where
     fn references(&self, answer: &str, passages: &[ContextPassage]) -> Vec<String> {
         let mut out = Vec::new();
         for cited in citation::parse(answer) {
-            if !citation::is_valid(&cited, passages) {
-                continue;
-            }
-            for passage in passages {
-                let source_ok = cited
-                    .source
-                    .as_ref()
-                    .map(|source| source == &passage.source)
-                    .unwrap_or(true);
-                let page_ok = cited
-                    .page
-                    .map(|page| Some(page) == passage.page)
-                    .unwrap_or(true);
-                if source_ok && page_ok {
-                    out.push(render::render_page(passage));
-                    break;
-                }
+            if let Some(passage) = passages
+                .iter()
+                .find(|passage| citation::matches(&cited, passage))
+            {
+                out.push(render::render_page(passage));
             }
         }
         out
@@ -196,13 +184,13 @@ mod tests {
     #[test]
     fn answers_with_cited_page_references() {
         let retrieval = FixedRetrieval::new(vec![candidate(2, "the answer is 42")]);
-        let generator = StubGenerator::new("It is 42 [doc.md, page 2].");
+        let generator = StubGenerator::new("It is 42 [doc.md - Intro - p.2].");
         let service = AnswerService::new(&retrieval, &generator, 1000);
 
         let answer = service.answer("what?").unwrap();
         assert!(!answer.refused);
-        assert!(answer.text.contains("[doc.md, page 2]"));
-        assert_eq!(answer.references, vec!["doc.md, page 2".to_string()]);
+        assert!(answer.text.contains("[doc.md - Intro - p.2]"));
+        assert_eq!(answer.references, vec!["doc.md - Intro - p.2".to_string()]);
         assert_eq!(generator.calls(), 1);
     }
 
@@ -221,12 +209,13 @@ mod tests {
     #[test]
     fn invalid_citations_are_dropped() {
         let retrieval = FixedRetrieval::new(vec![candidate(2, "body")]);
-        let generator = StubGenerator::new("Fact [doc.md, page 2] bogus [doc.md, page 9].");
+        let generator =
+            StubGenerator::new("Fact [doc.md - Intro - p.2] bogus [doc.md - Intro - p.9].");
         let service = AnswerService::new(&retrieval, &generator, 1000);
 
         let answer = service.answer("what?").unwrap();
-        assert!(answer.text.contains("[doc.md, page 2]"));
-        assert!(!answer.text.contains("page 9"));
+        assert!(answer.text.contains("[doc.md - Intro - p.2]"));
+        assert!(!answer.text.contains("p.9"));
     }
 
     struct FailingRetrieval;
