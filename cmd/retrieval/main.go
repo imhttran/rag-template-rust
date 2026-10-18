@@ -26,9 +26,9 @@ import (
 )
 
 const (
-	schemaVersion = "rag-retrieval/v1"
+	schemaVersion   = "rag-retrieval/v1"
 	maxRequestBytes = 1 << 20
-	allowedEnv    = "RAG_RETRIEVAL_ALLOWED_CORPORA"
+	allowedEnv      = "RAG_RETRIEVAL_ALLOWED_CORPORA"
 )
 
 type request struct {
@@ -105,6 +105,12 @@ func run() int {
 		return 0
 	}
 
+	parsedFilters, err := parseFilters(req.Filters)
+	if err != nil {
+		emit(response{SchemaVersion: schemaVersion, Status: "MALFORMED", Diagnostics: diagnostics{ErrorCode: "MALFORMED"}})
+		return 0
+	}
+
 	topK := req.TopK
 	if topK <= 0 || topK > 50 {
 		topK = 5
@@ -146,18 +152,8 @@ func run() int {
 		FinalK:        topK,
 		ExpandLimit:   0,
 		MinSimilarity: 0,
-		Language:      req.Filters.Language,
-		Filter: retrieval.Filter{
-			Corpus:       corpus,
-			SourcePrefix: req.Filters.SourcePrefix,
-			Language:     req.Filters.Language,
-		},
-	}
-	if t, ok := parseTime(req.Filters.IngestedFrom); ok {
-		opts.Filter.IngestedFrom = &t
-	}
-	if t, ok := parseTime(req.Filters.IngestedTo); ok {
-		opts.Filter.IngestedTo = &t
+		Language:      parsedFilters.Language,
+		Filter:        parsedFilters,
 	}
 
 	res, err := retrieval.HybridRetrieve(ctx, retrieval.New(conn), req.Query, vector, opts)
@@ -235,14 +231,43 @@ func allowed(corpus string) bool {
 	return false
 }
 
-func parseTime(s string) (time.Time, bool) {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return time.Time{}, false
+// parseFilters maps the request filters onto the retrieval filter. A non-empty
+// timestamp that cannot be parsed is an error: silently dropping it would widen
+// the result set instead of failing the malformed request.
+func parseFilters(raw filters) (retrieval.Filter, error) {
+	parsed := retrieval.Filter{
+		Corpus:       strings.TrimSpace(raw.Corpus),
+		SourcePrefix: raw.SourcePrefix,
+		Language:     strings.TrimSpace(raw.Language),
 	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return time.Time{}, false
+
+	if raw.IngestedFrom != "" {
+		t, err := parseTimestamp(raw.IngestedFrom)
+		if err != nil {
+			return retrieval.Filter{}, fmt.Errorf("ingested_from: %w", err)
+		}
+
+		parsed.IngestedFrom = &t
 	}
-	return t, true
+
+	if raw.IngestedTo != "" {
+		t, err := parseTimestamp(raw.IngestedTo)
+		if err != nil {
+			return retrieval.Filter{}, fmt.Errorf("ingested_to: %w", err)
+		}
+
+		parsed.IngestedTo = &t
+	}
+
+	return parsed, nil
+}
+
+// parseTimestamp parses an RFC 3339 timestamp, trimming surrounding whitespace.
+func parseTimestamp(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, fmt.Errorf("empty timestamp")
+	}
+
+	return time.Parse(time.RFC3339, value)
 }

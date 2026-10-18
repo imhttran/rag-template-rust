@@ -149,7 +149,7 @@ type chunkInsertBatch struct {
 	// $1 in this batch.
 	sql string
 
-	// args are the bind arguments, twelve per row, in chunk order.
+	// args are the bind arguments, paramsPerChunk per row, in chunk order.
 	args []any
 
 	// rows is how many chunk rows the statement inserts. It equals
@@ -328,10 +328,11 @@ func (i *Ingester) ReplaceDocumentWithProvenance(
 //
 // It returns true only when the source has at least one stored row and every
 // stored row carries the same content hash, chunker config, embedding model,
-// and (when supplied) embedding dimension as the supplied provenance. A missing
-// source, a content or chunker-config change, or a model or dimension change all
-// report false, which routes the caller through the full replacement path. The
-// page never participates, so re-ingesting unchanged content is a no-op.
+// language, corpus, and (when supplied) embedding dimension as the supplied
+// provenance. A missing source, a content or chunker-config change, a language
+// or corpus change, or a model or dimension change all report false, which
+// routes the caller through the full replacement path. The page never
+// participates, so re-ingesting unchanged content is a no-op.
 func (i *Ingester) IsUpToDate(
 	ctx context.Context,
 	source string,
@@ -342,42 +343,7 @@ func (i *Ingester) IsUpToDate(
 		matches int
 	)
 
-	// A zero dimension means the caller did not pin one, so the dimension check
-	// is skipped rather than matching against a stored NULL.
-	dimensionMatches := "TRUE"
-	if provenance.Dimension > 0 {
-		dimensionMatches = "embedding_dim = $5"
-	}
-
-	query := fmt.Sprintf(
-		`
-		SELECT
-		    COUNT(*),
-		    COUNT(*) FILTER (
-		        WHERE content_hash = $2
-		          AND chunker_config = $3
-		          AND embed_model = $4
-		          AND %s
-		    )
-		FROM documents
-		WHERE source = $1
-		`,
-		dimensionMatches,
-	)
-
-	// Bind only the placeholders the query actually references: with no dimension
-	// the FILTER uses TRUE and there is no $5, so passing a fifth argument fails
-	// the bind ("expected 4 arguments, got 5").
-	args := []any{
-		source,
-		provenance.ContentHash,
-		provenance.ChunkerConfig,
-		provenance.EmbedModel,
-	}
-
-	if provenance.Dimension > 0 {
-		args = append(args, provenance.Dimension)
-	}
+	query, args := provenanceMatchQuery(source, provenance)
 
 	err := i.conn.QueryRow(ctx, query, args...).Scan(&total, &matches)
 	if err != nil {
@@ -389,6 +355,53 @@ func (i *Ingester) IsUpToDate(
 	}
 
 	return matches == total, nil
+}
+
+// provenanceMatchQuery builds the provenance comparison IsUpToDate scans. Every
+// provenance column that participates in the up-to-date decision is compared
+// here, including language and corpus: re-ingesting an unchanged file under a
+// different corpus or language must replace the stored rows, not skip them.
+//
+// Nullable columns are compared through COALESCE so an empty provenance value
+// matches a stored NULL (the representation ingestion uses for "unset"). The
+// embedding dimension is only compared when the caller pinned one.
+func provenanceMatchQuery(source string, provenance Provenance) (string, []any) {
+	clauses := []string{
+		"content_hash = $2",
+		"chunker_config = $3",
+		"embed_model = $4",
+		"COALESCE(language, '') = $5",
+		"COALESCE(corpus, '') = $6",
+	}
+
+	args := []any{
+		source,
+		provenance.ContentHash,
+		provenance.ChunkerConfig,
+		provenance.EmbedModel,
+		provenance.Language,
+		provenance.Corpus,
+	}
+
+	if provenance.Dimension > 0 {
+		clauses = append(clauses, "embedding_dim = $7")
+		args = append(args, provenance.Dimension)
+	}
+
+	query := fmt.Sprintf(
+		`
+		SELECT
+		    COUNT(*),
+		    COUNT(*) FILTER (
+		        WHERE %s
+		    )
+		FROM documents
+		WHERE source = $1
+		`,
+		strings.Join(clauses, "\n          AND "),
+	)
+
+	return query, args
 }
 
 // embedAll embeds every chunk with bounded concurrency and returns the results
