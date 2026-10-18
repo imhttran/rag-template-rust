@@ -220,7 +220,7 @@ them; none re-implements them.
    Retrieval, ingestion, generation, reranking, answerability, and eval depend on
    interfaces, not concrete clients. Defaults remain Ollama + local models.
 2. **Determinism first.** Prefer deterministic checks before LLM judges
-   (`docs/plans/PLAN.md:281`; `docs/lessons.md` §13). New logic must be unit-testable
+   (`docs/plans/PLAN.md:281`; `docs/history/lessons.md` §13). New logic must be unit-testable
    without a database or model.
 3. **Shared pipeline.** Any retrieval change flows through
    `HybridRetrieve`/`MultiQueryRetrieve` so eval reflects production.

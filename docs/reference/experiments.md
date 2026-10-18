@@ -11,6 +11,10 @@ section. Metrics are hybrid retrieval recall/precision at K, evidence recall
 averaged over cases that declare `evidence` (before → after section expansion),
 and the similarity-only rejection rate on the unanswerable cases.
 
+Raw RQ-001 through RQ-006 captures, matrices, and diagnostic outputs are
+preserved under [`history/experiments/`](../history/experiments/). They are
+measurements, not current guidance; this page records the decisions they drove.
+
 ## Setup
 
 - Corpus: `examples/loan-policy.md`, `large-loan-policy.md`,

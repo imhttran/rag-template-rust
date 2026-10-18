@@ -19,14 +19,14 @@ support a cell, the cell is marked **not separately measured** with the reason.
 | Corpus manifest | `evals/corpus-vi-en.json` | `2ddbef2f…fbc87b21` | 8 docs |
 
 The same hashes and counts are recorded in `docs/plans/PLAN-RAG-024.md` and
-`docs/rq-024-operator-recovery-evidence.md`. The inputs are frozen; the `0.70`
+`docs/history/evidence/rq-024-operator-recovery-evidence.md`. The inputs are frozen; the `0.70`
 threshold and the historical record are unchanged.
 
 The 39 cases comprise 33 answerable cases and 6 answerable-but-absent “correct
 rejection” cases. Within the answerable set, the held-out split is populated by the
 five kinds **en-en**, **vi-vi**, **en-vi**, **vi-en**, and **misleading**
 (`PLAN-RAG-024` H1/H2/H6); the `en-vi`/`vi-en` cross-lingual buckets carry 5 cases each
-(`docs/rq-024-operator-recovery-evidence.md` Phase 1). Per-case kind labels are **not
+(`docs/history/evidence/rq-024-operator-recovery-evidence.md` Phase 1). Per-case kind labels are **not
 separately exposed** in the operator capture text; kind-attributed figures below are
 reported only where the capture supports them, otherwise marked *not separately
 measured*.
@@ -55,14 +55,14 @@ Every row records config, input hashes, per-kind metrics (where derivable), late
 
 | # | Configuration | Floor | TOP_K / FINAL_K | Inputs (sha256) | Per-kind metrics | Latency | Evidence path |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| C0 | vector-only, nomic-embed-text, CHUNK_SIZE=50/overlap=20 | **0.70** | TOP_K=4 (default) | `7f6926df…cbd2d0df` / `2ddbef2f…fbc87b21` | aggregate only (see §4); per-kind *not separately measured* | rerank off: avg 0s; lexical/llm/cross-encoder unavailable | `docs/rq-004-operator-floor-0.70-nomic-expanded.txt` |
-| C1 | hybrid RRF (vector+keyword, `rrfK=60`, equal weight), nomic, 50/20 | **0.70** | TOP_K=4 | as above | identical to C0 (see §6) | rerank off: avg 0s | `docs/rq-004-operator-floor-0.70-nomic-expanded.txt` |
-| C2 | vector-only, nomic, 50/20 | 0.50 | TOP_K=4 | as above | aggregate only; per-kind *not separately measured* | rerank off: avg 0s | `docs/rq-004-operator-floor-0.50-nomic-expanded.txt` |
-| C3 | hybrid RRF, nomic, 50/20 | 0.50 | TOP_K=4 | as above | — | rerank off: avg 0s | `docs/rq-004-operator-floor-0.50-nomic-expanded.txt` |
-| C4 | vector-only, nomic, 50/20 | 0.60 | TOP_K=4 | as above | aggregate only | rerank off: avg 0s | `docs/rq-004-operator-floor-0.60-nomic-expanded.txt` |
-| C5 | hybrid RRF, nomic, 50/20 | 0.60 | TOP_K=4 | as above | — | rerank off: avg 0s | `docs/rq-004-operator-floor-0.60-nomic-expanded.txt` |
-| C6 | vector-only, nomic, 50/20 | **0.70** | **TOP_K=8** | as above | aggregate only | rerank off: avg 0s | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
-| C7 | hybrid RRF, nomic, 50/20 | **0.70** | **TOP_K=8** | as above | — | rerank off: avg 0s | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
+| C0 | vector-only, nomic-embed-text, CHUNK_SIZE=50/overlap=20 | **0.70** | TOP_K=4 (default) | `7f6926df…cbd2d0df` / `2ddbef2f…fbc87b21` | aggregate only (see §4); per-kind *not separately measured* | rerank off: avg 0s; lexical/llm/cross-encoder unavailable | `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt` |
+| C1 | hybrid RRF (vector+keyword, `rrfK=60`, equal weight), nomic, 50/20 | **0.70** | TOP_K=4 | as above | identical to C0 (see §6) | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt` |
+| C2 | vector-only, nomic, 50/20 | 0.50 | TOP_K=4 | as above | aggregate only; per-kind *not separately measured* | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt` |
+| C3 | hybrid RRF, nomic, 50/20 | 0.50 | TOP_K=4 | as above | — | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt` |
+| C4 | vector-only, nomic, 50/20 | 0.60 | TOP_K=4 | as above | aggregate only | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt` |
+| C5 | hybrid RRF, nomic, 50/20 | 0.60 | TOP_K=4 | as above | — | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt` |
+| C6 | vector-only, nomic, 50/20 | **0.70** | **TOP_K=8** | as above | aggregate only | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
+| C7 | hybrid RRF, nomic, 50/20 | **0.70** | **TOP_K=8** | as above | — | rerank off: avg 0s | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
 
 **Exact reproducible command (operator-captured):**
 
@@ -96,7 +96,7 @@ are not proposed as production settings.
 | 0.60 | 0.48 | **0.67** | 0.28 | 0.64 | 4/6 (**0.67**) | 0.33 | **0.00** |
 | **0.70 (acceptance)** | **0.42** | **0.52** | **0.22** | **0.48** | **6/6 (1.00)** | **0.00** | **0.00** |
 
-Source: `docs/rq-024-operator-recovery-evidence.md` Phase 4;
+Source: `docs/history/evidence/rq-024-operator-recovery-evidence.md` Phase 4;
 `docs/rq-004-operator-floor-{0.50,0.60,0.70}-nomic-expanded.txt`.
 
 **Finding:** lowering the floor buys recall at the cost of rejection. From 0.70 to
@@ -111,8 +111,8 @@ rejection/citation integrity control; **it must not be lowered to pass.**
 
 | Config | TOP_K | R@8 | R@4 | Rejection | Evidence path |
 | --- | --- | --- | --- | --- | --- |
-| C6 vector-only, floor 0.70 | 8 | **0.52** | 0.52 | 6/6 (1.00) | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
-| C7 hybrid, floor 0.70 | 8 | **0.52** | 0.52 | 6/6 (1.00) | `docs/rq-004-operator-topk8-nomic-expanded.txt` |
+| C6 vector-only, floor 0.70 | 8 | **0.52** | 0.52 | 6/6 (1.00) | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
+| C7 hybrid, floor 0.70 | 8 | **0.52** | 0.52 | 6/6 (1.00) | `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt` |
 
 **Finding:** `TOP_K=8` yields R@8 `0.52` — **identical to R@4 `0.52`**, so a larger
 candidate pool recovers **nothing**. The cross-lingual sections are absent pre-retrieval
@@ -141,8 +141,8 @@ to unweighted) but **the weighted variant is absent from this checkout**; there 
 **no operator measurement for any non-equal-weight setting** → weighted-RRF metrics are
 **not separately measured**.
 
-Source: `docs/rq-024-operator-recovery-evidence.md` Phase 4;
-`docs/rq-004-operator-floor-0.70-nomic-expanded.txt`.
+Source: `docs/history/evidence/rq-024-operator-recovery-evidence.md` Phase 4;
+`docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt`.
 
 ---
 
@@ -154,8 +154,8 @@ Source: `docs/rq-024-operator-recovery-evidence.md` Phase 4;
 | CHUNK_SIZE 30 / 50 / 100 | **0.00** |
 | nomic-embed-text and embeddinggemma | **0.00** (R@1 and R@4, all 10 cross-lingual cases) |
 
-Sources: `docs/rq-024-operator-recovery-evidence.md` Phase 3 + Phase 4;
-`docs/rq-003-embedding-model-matrix.md`.
+Sources: `docs/history/evidence/rq-024-operator-recovery-evidence.md` Phase 3 + Phase 4;
+`docs/history/experiments/rq-003-embedding-model-matrix.md`.
 
 **Finding:** cross-lingual (vi↔en) retrieval is `0.00` at **every** floor and chunk
 size, and across both evaluated embedding models. This is a candidate-miss
@@ -193,7 +193,7 @@ weighted-RRF setting is **unmeasured** (`weighted-rrf-vec2` in `evals/sweep-reco
 
 ## 9. Rank-1 loss and floor-truncation analysis
 
-Derived from the per-case rows in `docs/rq-004-operator-floor-0.70-nomic-expanded.txt`
+Derived from the per-case rows in `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt`
 (with the 0.50/0.60 captures for floor comparison). Classification of rank-1 outcomes
 over the 33 answerable cases + 6 correct rejections:
 
@@ -257,7 +257,7 @@ changes (R4).
 
 ### 10.1 Experimental-tooling removal proposal (recommendation only)
 
-The experimental ranking/sweep tooling described in `docs/rq-024-operator-recovery-evidence.md`
+The experimental ranking/sweep tooling described in `docs/history/evidence/rq-024-operator-recovery-evidence.md`
 Phase 1 — `internal/retrieval/ranking.go` (PathMode/BuildOptions/Fuse/RunConfiguration),
 `internal/retrieval/sweep.go` (synthetic `FixtureSearcher` harness), and the
 `FuseRankingsWeighted` change in `internal/retrieval/hybrid.go` — is **unused by
@@ -277,12 +277,12 @@ to operator authorization.**
 
 **Evidence paths (operator-run, authoritative):**
 
-- `docs/rq-024-operator-recovery-evidence.md` — Phase 4 (floor/candidate/vector-vs-hybrid/cross-lingual)
-- `docs/rq-004-operator-floor-0.50-nomic-expanded.txt`
-- `docs/rq-004-operator-floor-0.60-nomic-expanded.txt`
-- `docs/rq-004-operator-floor-0.70-nomic-expanded.txt`
-- `docs/rq-004-operator-topk8-nomic-expanded.txt`
-- `docs/rq-003-embedding-model-matrix.md` (cross-lingual corroboration)
+- `docs/history/evidence/rq-024-operator-recovery-evidence.md` — Phase 4 (floor/candidate/vector-vs-hybrid/cross-lingual)
+- `docs/history/experiments/rq-004-operator-floor-0.50-nomic-expanded.txt`
+- `docs/history/experiments/rq-004-operator-floor-0.60-nomic-expanded.txt`
+- `docs/history/experiments/rq-004-operator-floor-0.70-nomic-expanded.txt`
+- `docs/history/experiments/rq-004-operator-topk8-nomic-expanded.txt`
+- `docs/history/experiments/rq-003-embedding-model-matrix.md` (cross-lingual corroboration)
 - `evals/sweep-records/SYNTHETIC-NOT-MEASURED.md` (exclusion rationale)
 
 **Reproduce (operator-side, disposable DB required):**

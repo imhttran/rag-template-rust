@@ -13,17 +13,17 @@ items. This note **makes no production change**.
 
 | Task | Outcome | Evidence (repository paths / symbols) |
 | --- | --- | --- |
-| **RAG-025A** — Provider integration | Done | `cmd/rag/main.go`, `cmd/eval/main.go`, `cmd/ingest/main.go` resolve the embedder/generator through `cfg.Embedder()` / `cfg.Generator()`; `internal/config/config.go` `Load`/`validateEmbedProvider`/`validateGenProvider`; `internal/provider/stub_test.go`, `internal/provider/registry_seam_test.go`; `docs/rag-025a-recovery-evidence.md`. |
-| **RAG-025B** — End-to-end reliability | Done | `internal/rag/e2e_test.go`, `internal/rag/e2e_db_test.go` (`TestE2EIngestRetrieveGenerateDBIntegration`, `TestE2EIngestReplacementIsAtomicDBIntegration`), `internal/rag/reliability_test.go`, `docs/guides/testing.md`, `docs/rag-025b-e2e-evidence.md`. |
+| **RAG-025A** — Provider integration | Done | `cmd/rag/main.go`, `cmd/eval/main.go`, `cmd/ingest/main.go` resolve the embedder/generator through `cfg.Embedder()` / `cfg.Generator()`; `internal/config/config.go` `Load`/`validateEmbedProvider`/`validateGenProvider`; `internal/provider/stub_test.go`, `internal/provider/registry_seam_test.go`; `docs/history/evidence/rag-025a-recovery-evidence.md`. |
+| **RAG-025B** — End-to-end reliability | Done | `internal/rag/e2e_test.go`, `internal/rag/e2e_db_test.go` (`TestE2EIngestRetrieveGenerateDBIntegration`, `TestE2EIngestReplacementIsAtomicDBIntegration`), `internal/rag/reliability_test.go`, `docs/guides/testing.md`, `docs/history/evidence/rag-025b-e2e-evidence.md`. |
 | **RAG-025C** — Configuration hardening | Done (confirmed in §4) | `internal/config/config_test.go` — `RAGTestDBMarker`, `requireDisposableDB`, `databaseNameFromURL`, `TestRequireDisposableDBRefusesRagDB` (+ marker/opt-in/blank/unset subtests), `TestDatabaseNameFromURL`. |
 | **RAG-025D** — Architecture and documentation | Done (confirmed in §4) | `README.md`, `docs/README.md`, `docs/architecture/OVERVIEW.md`, `docs/reference/capabilities.md`, `docs/reference/configuration.md`. |
-| **RAG-025E** — Cross-platform readiness | Done | `docs/operations/platform-support.md`, `docs/rag-025e-recovery-evidence.md`. |
+| **RAG-025E** — Cross-platform readiness | Done | `docs/operations/platform-support.md`, `docs/history/evidence/rag-025e-recovery-evidence.md`. |
 
 ## 2. P0/P1 resolution status
 
 | Priority | Item | Status | Evidence |
 | --- | --- | --- | --- |
-| **P0** | Provider registry not wired into commands (`EMBED_PROVIDER`/`GEN_PROVIDER` ignored) | **Fixed** | `cmd/rag`, `cmd/eval`, `cmd/ingest` call `cfg.Embedder()` / `cfg.Generator()`; `internal/config/config.go` `Embedder`/`Generator` delegate to `provider.Embedder`/`provider.Generator`. Default (unset/`ollama`) delegates to the same vendor client, URL, model, and timeout as before — structural equivalence per `docs/rag-025a-recovery-evidence.md` (not a live byte-identical diff). |
+| **P0** | Provider registry not wired into commands (`EMBED_PROVIDER`/`GEN_PROVIDER` ignored) | **Fixed** | `cmd/rag`, `cmd/eval`, `cmd/ingest` call `cfg.Embedder()` / `cfg.Generator()`; `internal/config/config.go` `Embedder`/`Generator` delegate to `provider.Embedder`/`provider.Generator`. Default (unset/`ollama`) delegates to the same vendor client, URL, model, and timeout as before — structural equivalence per `docs/history/evidence/rag-025a-recovery-evidence.md` (not a live byte-identical diff). |
 | **P1** | No fail-fast provider validation at `config.Load` | **Fixed** | `validateEmbedProvider`/`validateGenProvider` in `internal/config/config.go`; error names variable and value (`EMBED_PROVIDER=%q is not a registered provider`). Covered by `TestLoad` subtests `unknown embed provider fails fast` / `unknown gen provider fails fast`. |
 | **P1** | Docs overstating provider wiring / Go version / cross-platform notes; `cmd/expbilingual` undocumented | **Corrected** | `docs/reference/configuration.md`, `docs/architecture/OVERVIEW.md`, `docs/reference/capabilities.md`, `README.md`, `docs/README.md`, `docs/operations/platform-support.md`. `cmd/expbilingual` present (see §4). |
 | **P2** | Docs index for RAG-024/RAG-025; README architecture accuracy | **Addressed** | `docs/README.md` links: `operations/platform-support.md`, `rag-025a-recovery-evidence.md`, `rag-025b-e2e-evidence.md`, `rag-025e-recovery-evidence.md` (all resolve, see §4). |
@@ -64,7 +64,7 @@ RAG_TEST_DATABASE_URL=postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable
 ```
 
 **Real-Ollama smoke testing is optional and non-gating** and is reported separately
-(`docs/rag-025b-e2e-evidence.md`, "Real-Ollama smoke testing" section). It is never part of
+(`docs/history/evidence/rag-025b-e2e-evidence.md`, "Real-Ollama smoke testing" section). It is never part of
 `go test ./...` and never gates a commit, push, or merge.
 
 ## 4. RAG-025C and RAG-025D confirmation
@@ -107,9 +107,9 @@ Method: `git status`/`git diff` scope review plus inspection of defaults.
 | Protected class | Verification | Status |
 | --- | --- | --- |
 | Production defaults (`OLLAMA_URL`=`http://localhost:11434`, `DATABASE_URL` port `5434`, embed model `nomic-embed-text`, chat model, `REQUEST_TIMEOUT`=5m, `EMBED_DIM`=768, `MIN_SIMILARITY`=0.6, others) | `internal/config/config.go` constants and `TestLoadDefaults` | **Unchanged** — no recorded default change |
-| 0.70 threshold / frozen evaluation datasets (`docs/rq-*.txt`/`.json`, `docs/rq-00*-*.md`) | diff scope review; not modified or deleted | **Untouched** |
-| RAG-023 / RAG-024 archives (`docs/plans/PLAN-RAG-023*.md`, `docs/plans/PLAN-RAG-024.md`, `docs/rq-008-final-acceptance.md`, `docs/rq-024-operator-recovery-evidence.md`) | diff scope review; not modified or deleted | **Untouched** |
-| Deferred multilingual backlog (`docs/rq-007-deferred-bilingual-backlog.md`) | not reopened; not modified | **Untouched** |
+| 0.70 threshold / frozen evaluation datasets (`docs/history/experiments/rq-*` and `docs/rq-006-query-cache.json`) | diff scope review; not modified or deleted | **Untouched** |
+| RAG-023 / RAG-024 archives (`docs/plans/PLAN-RAG-023*.md`, `docs/plans/PLAN-RAG-024.md`, `docs/history/evidence/rq-008-final-acceptance.md`, `docs/history/evidence/rq-024-operator-recovery-evidence.md`) | diff scope review; not modified or deleted | **Untouched** |
+| Deferred multilingual backlog (`docs/plans/BACKLOG-RAG-007.md`) | not reopened; not modified | **Untouched** |
 | User-owned files (`docs/plans/PLAN-RAG-Phase-23.md`, `docs/plans/PLAN-RAG-Phase-23b.md`, `docs/sop-defect-historicalize-stale-approval.md`) | present; not modified/removed by RAG-025 | **Preserved** |
 | `migrations/*.sql` | not modified | **Untouched** |
 | Production database `rag_db` | never targeted by any test path (see §6 guard) | **Untouched** |
@@ -143,7 +143,7 @@ Pre-existing user-owned documents in the working tree are preserved.
 | Item | Reason | Owning layer | Disposition |
 | --- | --- | --- | --- |
 | `govulncheck ./...` under Go 1.27.2 | Requires the 1.27.2 toolchain and the `govulncheck` binary; if unavailable in the closure environment it cannot be executed. | Development environment / toolchain | **Executed — PASS** (`No vulnerabilities found.`, §9). The earlier “candidate operator waiver” applies **only** if the 1.27.2 toolchain / `govulncheck` binary are unavailable. |
-| Real-Ollama smoke test | Requires a live Ollama server; explicitly optional and non-gating. | Manual/operator | **Waived** by plan design (`docs/rag-025b-e2e-evidence.md`). |
+| Real-Ollama smoke test | Requires a live Ollama server; explicitly optional and non-gating. | Manual/operator | **Waived** by plan design (`docs/history/evidence/rag-025b-e2e-evidence.md`). |
 | DB-backed integration execution | Requires `make db-up` disposable PostgreSQL; DB tests skip without it. | Test harness / operator | Standard gates pass with DB tests skipping; operator decides whether to run integration. |
 | Operator approval of the plan | The plan is **ACTIVE** (`plan-rag-025`; an earlier draft of this note said `PROPOSED`) and RAG-025F reached `LOCAL_DONE`; closure acceptance and historicalization still require operator approval. | Operator (human gate via SOP) | **Human gate** — see §8. |
 | Historicalization | `/sop-historicalize` is a separate, explicit, operator-initiated step. | Operator (human gate via SOP) | **Not performed here.** |
@@ -197,11 +197,11 @@ Pre-existing user-owned documents in the working tree are preserved.
 
   | Task | SOP outcome | Recovery / evidence |
   | --- | --- | --- |
-  | RAG-025A | PARTIAL | `docs/rag-025a-recovery-evidence.md` |
-  | RAG-025B | PARTIAL | `docs/rag-025b-e2e-evidence.md` (+ disposable-DB E2E verified) |
+  | RAG-025A | PARTIAL | `docs/history/evidence/rag-025a-recovery-evidence.md` |
+  | RAG-025B | PARTIAL | `docs/history/evidence/rag-025b-e2e-evidence.md` (+ disposable-DB E2E verified) |
   | RAG-025C | PARTIAL | test-DB guard + `docs/reference/configuration.md` (verified, §4) |
   | RAG-025D | PARTIAL | docs updated (§1/§4) + §9.1 corrections |
-  | RAG-025E | PARTIAL | `docs/operations/platform-support.md` + `docs/rag-025e-recovery-evidence.md` |
+  | RAG-025E | PARTIAL | `docs/operations/platform-support.md` + `docs/history/evidence/rag-025e-recovery-evidence.md` |
   | RAG-025F | PARTIAL | this closure note + §9 |
 
   ## 11. Final architecture assessment
@@ -216,14 +216,14 @@ Pre-existing user-owned documents in the working tree are preserved.
   - **Boundaries.** Commands own no retrieval/storage logic; schema is owned by `migrations/`;
     the provider is a registry entry, not a pipeline edit.
   - **Not implemented:** OCR (RAG-008), genealogy extraction (RAG-016); deferred bilingual
-    production retrieval (`docs/rq-007-deferred-bilingual-backlog.md`).
+    production retrieval (`docs/plans/BACKLOG-RAG-007.md`).
 
   ## 12. Recommended next backlog
 
   1. **Harden the acceptance criteria into machine-checkable commands** (the root cause of the
      recurring `PARTIAL` metadata outcome).
   2. **Rejection-preserving cross-lingual retrieval** (RQ-006 D2 shape) + an **authorized
-     multilingual embedding model** (`docs/rq-007-deferred-bilingual-backlog.md`).
+     multilingual embedding model** (`docs/plans/BACKLOG-RAG-007.md`).
   3. **Windows-native support** — address the POSIX `sh`/`Makefile` gap
      (`docs/operations/platform-support.md`).
   4. **Phase-23b** (PDF/OCR/page provenance) — frozen; requires operator authorization.

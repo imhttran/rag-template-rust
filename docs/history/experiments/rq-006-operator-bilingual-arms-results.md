@@ -41,7 +41,7 @@ before it can be considered.
   the baseline exactly. Comparisons across arms use one consistent method.
 - The local model is not pinned for determinism; these are **single runs**. Treat cross-arm
   deltas as directional, and re-run with pinned decoding to confirm.
-- Captures: `docs/rq-006-operator-armA-baseline.txt`, `docs/rq-006-operator-armB-expansion-llama.txt`,
-  `docs/rq-006-operator-armC-translation-llama.txt`.
+- Captures: `docs/history/experiments/rq-006-operator-armA-baseline.txt`, `docs/history/experiments/rq-006-operator-armB-expansion-llama.txt`,
+  `docs/history/experiments/rq-006-operator-armC-translation-llama.txt`.
 
 *Operator-measured; frozen inputs, the `0.70` threshold, and historical RAG-023 records are unchanged.*
