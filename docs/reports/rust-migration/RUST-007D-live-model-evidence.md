@@ -47,6 +47,10 @@ RAG_CITATION_VALIDATION=true
 REQUEST_TIMEOUT=5m
 ```
 
+`RAG_CITATION_VALIDATION` is consumed by the Go reference (`cmd/rag`). The
+Rust `query` binary does not read it: `AnswerService` always applies citation
+repair, so the Rust run is equivalent to validation-on.
+
 ## 3. Commands
 
 ```sh
