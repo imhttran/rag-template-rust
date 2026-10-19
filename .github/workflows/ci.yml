@@ -47,6 +47,11 @@ jobs:
         run: cargo test --locked
       - name: Clippy
         run: cargo clippy --locked --all-targets -- -D warnings
+      # The clean-checkout gate proves the package builds with no Go toolchain.
+      # GitHub's runner image ships Go in /usr/bin, so remove it first instead
+      # of weakening the test's absence assertion.
+      - name: Remove Go from the verification environment
+        run: sudo rm -f /usr/bin/go /usr/local/go/bin/go
       - name: Final layout and clean checkout without Go
         run: make transition-evidence
 
