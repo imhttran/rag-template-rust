@@ -3,7 +3,7 @@
 Repository: https://github.com/imhttran/rag-template-rust
 Target path: `docs/plans/PLAN-RUST-MIGRATION.md`
 Created: 2026-10-17
-Status: ACTIVE — RUST-001 through RUST-007E verified; RUST-008A, RUST-007C, and RUST-008 are pending.
+Status: ACTIVE — RUST-001 through RUST-008A verified; RUST-007C and RUST-008 are pending.
 
 ## Project
 
@@ -913,6 +913,10 @@ Add the real Axum API and Next.js upload → ingest → question → cited-answe
 - criterion 3: manual: operator-run UI loading, empty, connection-failure, and extraction-error evidence
 - criterion 4: check 2
 - criterion 5: check 1
+
+### Execution
+
+- verify-first
 
 ### Work Steps
 

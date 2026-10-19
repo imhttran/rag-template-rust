@@ -19,6 +19,7 @@ Evidence for `docs/plans/PLAN-RUST-MIGRATION.md`. Reference SHA frozen by RUST-0
 | `RUST-007E-live-evidence.md` | RUST-007E live Ollama + PostgreSQL ingest → query → cited-answer observations, citations, and missing-context refusal |
 | `RUST-007E-k3-parity.md` | RUST-007E original K=3 parity: frozen Go reference vs Rust `eval`, ranking order, and metrics |
 | `RUST-007E-md-text-ingestion.md` | RUST-007E production Markdown/plain-text ingestion, provenance, and transactional safety |
+| `web-e2e/` | RUST-008A Playwright screenshots for the real browser flow and UI states |
 | `sop-cargo-support.patch` | Reviewed SOP Cargo-support patch, base `a46187b` (SHA-256 `79dd707e…b893`) |
 | `sop-cargo-support-integrated.patch` | The same patch integrated onto current `origin/main` `a9f0495` (SHA-256 `48530f34…4ac6`) |
 

@@ -45,6 +45,8 @@ targets run the Rust suite and the RUST-007B transition evidence.
 | `make rust-acceptance-ingest-md-text` | production Markdown/plain-text ingestion and transaction safety   |
 | `make rust-acceptance-live-rag`    | live Ollama + PostgreSQL ingest → query → cited-answer verification  |
 | `make rust-acceptance-functional`  | K=3 parity + Markdown/plain-text ingestion (needs the database)      |
+| `make rust-acceptance-api-contract` | deterministic Axum API contract (upload, status, query, health, refusal) |
+| `make web-e2e`                      | real-browser Playwright upload → ingest → cited-answer verification   |
 | `make transition-evidence`          | the RUST-007B acceptance crates                                     |
 | `make rust-check`                   | fmt, build, test, clippy, and transition evidence                    |
 | `make check`                        | Go unit tests, `rust-check`, and the web checks                      |
@@ -53,3 +55,20 @@ The clean-checkout crate stages a copy of the working tree and runs the
 documented sequence from
 [the usage guide](../guides/usage.md#clean-checkout-with-go-present):
 `go build ./...`, `go test ./...`, `go vet ./...`, and `make rust-test`.
+
+## Rust API and web UI (RUST-008A)
+
+The Axum API binary (`rust/src/bin/api.rs`) serves the browser-facing contract
+and calls the same Rust services as the CLI:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | Service, database, and model status; never returns credentials |
+| `POST /api/documents/ingest` | Multipart `file` upload for `.md`, `.markdown`, `.txt`, `.pdf` |
+| `GET /api/documents/{source}/status` | Stored chunks, sections, pages, corpus, and fingerprint |
+| `POST /api/query` | `{question, top_k?}` -> answer, `insufficient`, and cited sources |
+
+`API_HOST` defaults to `127.0.0.1` and `API_PORT` to `8080`. `RAG_CORPUS`
+selects the corpus (default `trusted`). The Next.js app in `web/` proxies
+same-origin `/api/*` server-side to `API_URL`; the browser never receives the
+API URL or credentials. Run `make web-e2e` for the real-browser check.

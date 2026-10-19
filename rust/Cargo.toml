@@ -27,6 +27,10 @@ path = "src/bin/eval.rs"
 name = "expbilingual"
 path = "src/bin/expbilingual.rs"
 
+[[bin]]
+name = "api"
+path = "src/bin/api.rs"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -45,6 +49,11 @@ lopdf = "0.34"
 postgres = "0.19"
 r2d2 = "0.8"
 r2d2_postgres = "0.18"
+# HTTP API (RUST-008A): Axum serves the browser-facing contract; Tokio provides
+# the runtime. Blocking database/Ollama work runs through spawn_blocking so it
+# never occupies an async executor thread.
+axum = { version = "0.8", features = ["multipart"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
 
 [dev-dependencies]
 tempfile = "3"

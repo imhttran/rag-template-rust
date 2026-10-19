@@ -89,6 +89,23 @@ Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`,
 settings matrix). See the [command reference](docs/reference/commands.md) for
 flags and environment settings.
 
+## Web UI (RUST-008A)
+
+The real browser UI lives under `web/`. The browser calls only same-origin Next.js
+`/api/*` endpoints; the Next.js server proxies them to the Rust Axum API, and the
+API calls the same ingestion, retrieval, generation, and citation-validation
+services as the CLI. The UI is no longer mock-only.
+
+```bash
+cargo build --locked --manifest-path rust/Cargo.toml --bin api
+rust/target/debug/api          # 127.0.0.1:8080
+make web-start                 # 127.0.0.1:3000
+make web-e2e                   # real-browser Playwright verification
+```
+
+See [web/README.md](web/README.md) and the
+[RUST-008A browser evidence](docs/reference/rust-008a-browser-evidence.md).
+
 ## Go and Rust coexist during the transition
 
 The Go reference implementation stays present and unchanged. The Rust port lives

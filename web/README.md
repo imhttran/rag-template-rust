@@ -1,16 +1,46 @@
-# RAG Web UI (prototype) — UI-002
+# RAG Web UI — RUST-008A
 
-A Next.js App Router prototype of the RAG web UI. It runs on **mock data only**:
-responses are simulated and do **not** come from the Rust pipeline (real wiring is
-UI-003/UI-004). A visible "Mock mode" banner labels this on every screen.
+A Next.js App Router UI over the real Rust Axum API. The browser calls only
+same-origin Next.js `/api/*` endpoints; the Next.js server proxies those
+requests to Axum, and Axum calls the same ingestion, retrieval, generation, and
+citation-validation services as the Rust CLI.
 
-Conventions are reused from the `inventory` reference (AppShell / PageHeader /
-PageTitle / PageFooter / FormStatus / SystemStatus, `@/*` import paths, and the
-same-origin `/api/*` proxy in `next.config.ts`).
+```text
+Browser -> Next.js /api/* -> Axum -> Rust services -> PostgreSQL + Ollama
+```
+
+No data is mocked and no credential reaches the browser. `API_URL` is a
+server-side setting; both Next.js and Axum bind `127.0.0.1` by default.
+
+## What it does
+
+- Uploads `.md`, `.markdown`, `.txt`, and `.pdf` documents (10 MiB limit).
+- Reports ingestion status with stored chunks, sections, and page provenance.
+- Rejects incomplete PDFs before embedding or any database write.
+- Asks questions and renders grounded answers with source citations.
+- Shows PDF page references when the source carries page metadata.
+- Shows loading, empty, connection-failure, extraction-error, and
+  insufficient-evidence states.
+
+## Run
+
+Start the database and Ollama as for the CLI, then:
+
+```sh
+cargo build --locked --manifest-path rust/Cargo.toml --bin api
+rust/target/debug/api            # 127.0.0.1:8080, RAG_CORPUS default "trusted"
+make web-start                   # 127.0.0.1:3000
+```
+
+The API reads the same environment as the CLI (`DATABASE_URL`, `OLLAMA_URL`,
+`OLLAMA_EMBED_MODEL`, `OLLAMA_CHAT_MODEL`, `EMBED_DIM`, `RAG_CORPUS`,
+`TOP_K`/`FINAL_K`/`MIN_SIMILARITY`, `REQUEST_TIMEOUT`). `API_HOST` and
+`API_PORT` select the bind address.
 
 ## Supported Node and npm
 
-Declared in `package.json` (`engines`); **tested with Node 24.21.0 and npm 11.19.0**:
+Declared in `package.json` (`engines`); tested with Node 24.21.0 and npm
+11.19.0:
 
 | Tool | Supported |
 | --- | --- |
@@ -18,48 +48,42 @@ Declared in `package.json` (`engines`); **tested with Node 24.21.0 and npm 11.19
 | npm | `>=10.0.0 <12.0.0` |
 
 Every web command validates both versions first. The toolchain is resolved, in
-order, from **explicit overrides** (`NODE_BIN`, `NPM_BIN`), then **`PATH`**, then
-**Zed's bundled Node** (any versioned install, no user name hard-coded). If the
-tools are missing or out of range the command stops with setup instructions; it
-never installs or upgrades anything.
+order, from explicit overrides (`NODE_BIN`, `NPM_BIN`), then `PATH`, then Zed's
+bundled Node. Nothing is installed or upgraded automatically.
 
-## Run
+## Commands
 
 ```sh
-cd web
-npm install
 npm run dev          # http://127.0.0.1:3000
 npm run typecheck    # tsc --noEmit
 npm run build        # next build
+npm run e2e          # Playwright (servers must already be running)
 ```
 
-Both `dev` and `start` bind `127.0.0.1`. `API_URL` (server-side, default
-`http://127.0.0.1:8080`) is used only by the server-side rewrite; it is never sent
-to the browser.
-
-## Makefile targets (run from the repository root)
+From the repository root:
 
 ```sh
 make web-check-env   # resolve and validate the Node/npm toolchain
-make web-install     # install web dependencies with that toolchain
-make web-start       # start the prototype in the background on 127.0.0.1:3000
+make web-install     # install web dependencies
+make web-start       # start Next.js on 127.0.0.1:3000 (background)
 make web-status      # report state, URL, and log path
-make web-stop        # stop the prototype started by make web-start
+make web-stop        # stop the Next.js server started by make web-start
 make web-typecheck   # tsc --noEmit
 make web-build       # production build (into .next-build)
+make web-e2e         # start Axum + Next.js, run Playwright, clean up the corpus
 ```
 
-`make web-start` refuses to start a duplicate, and refuses to start when port 3000
-is already in use by another service (it never stops that service). It finds
-Node/npm on `PATH`, or the Zed-bundled installation, or an explicit override
-(`NODE_BIN=... NPM_BIN=...`).
+`make web-e2e` is the real-browser verification. It needs PostgreSQL and Ollama,
+uses a unique corpus, and deletes only that corpus afterwards. Evidence and
+screenshots are recorded under `docs/reports/rust-migration/web-e2e/` and
+summarized in `docs/reference/rust-008a-browser-evidence.md`.
 
-The PID file and log live under `web/.run/` (`web.pid`, `web.log`), which is
-git-ignored. `make web-stop` stops only this project's server and its child
-processes, and handles a stale PID file safely.
+## API contract
 
-## Mock scenarios
+The browser-facing contract is in
+[`docs/reports/rust-migration/web-ui/API-CONTRACTS.md`](../docs/reports/rust-migration/web-ui/API-CONTRACTS.md)
+with the RUST-008A implementation differences recorded in
+[`docs/reference/rust-008a-browser-evidence.md`](../docs/reference/rust-008a-browser-evidence.md).
 
-Choose a scenario in the UI to demonstrate: `success`, `empty`,
-`insufficient-evidence`, `connection-failure`, `invalid-file`, `incomplete-pdf`,
-`loading`.
+`next.config.ts` keeps the same-origin `/api/*` rewrite. The browser never
+receives the Axum URL, database DSN, or model configuration.

@@ -65,6 +65,9 @@ pub struct Answer {
     pub text: String,
     /// Rendered page references for the cited evidence, in order.
     pub references: Vec<String>,
+    /// The budgeted passages the answer actually cites, with provenance.
+    /// Empty for a refusal or an uncited answer.
+    pub citations: Vec<ContextPassage>,
     /// `true` when the baseline refusal was returned.
     pub refused: bool,
 }
@@ -122,6 +125,7 @@ where
             return Ok(Answer {
                 text: answerability::refusal(),
                 references: Vec::new(),
+                citations: Vec::new(),
                 refused: true,
             });
         }
@@ -134,9 +138,11 @@ where
             raw
         };
         let references = self.references(&final_text, &passages);
+        let citations = self.cited_passages(&final_text, &passages);
         Ok(Answer {
             text: final_text,
             references,
+            citations,
             refused: false,
         })
     }
@@ -175,6 +181,28 @@ where
                 .find(|passage| citation::matches(&cited, passage))
             {
                 out.push(render::render_page(passage));
+            }
+        }
+        out
+    }
+
+    /// Returns the cited passages in answer order, deduplicated by identity so a
+    /// repeated citation does not produce a repeated source entry.
+    fn cited_passages(&self, answer: &str, passages: &[ContextPassage]) -> Vec<ContextPassage> {
+        let mut out: Vec<ContextPassage> = Vec::new();
+        for cited in citation::parse(answer) {
+            if let Some(passage) = passages
+                .iter()
+                .find(|passage| citation::matches(&cited, passage))
+            {
+                let duplicate = out.iter().any(|existing| {
+                    existing.source == passage.source
+                        && existing.section == passage.section
+                        && existing.page == passage.page
+                });
+                if !duplicate {
+                    out.push(passage.clone());
+                }
             }
         }
         out

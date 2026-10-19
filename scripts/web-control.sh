@@ -135,7 +135,7 @@ cmd_install() {
 	exec "$NPM" install --no-audit --no-fund
 }
 
-cmd_run() { # $1 = npm script (typecheck|build)
+cmd_run() { # $1 = npm script (typecheck|build|e2e)
 	check_env
 	cd "$WEB_DIR"
 	if [ "$1" = "build" ]; then
@@ -216,8 +216,9 @@ case "${1:-}" in
 	install) cmd_install ;;
 	typecheck) cmd_run typecheck ;;
 	build) cmd_run build ;;
+	e2e) cmd_run e2e ;;
 	start) cmd_start ;;
 	stop) cmd_stop ;;
 	status) cmd_status ;;
-	*) echo "usage: $0 check-env|install|typecheck|build|start|stop|status" >&2; exit 2 ;;
+	*) echo "usage: $0 check-env|install|typecheck|build|e2e|start|stop|status" >&2; exit 2 ;;
 esac

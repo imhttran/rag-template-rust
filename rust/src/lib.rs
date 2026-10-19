@@ -12,6 +12,7 @@
 //! bilingual experiment harness ([`bilingual`]).
 
 pub mod answer;
+pub mod api;
 pub mod bilingual;
 pub mod chunker;
 pub mod config;
@@ -25,6 +26,7 @@ pub mod loader;
 pub mod ollama;
 pub mod pipeline;
 pub mod provider;
+pub mod query_service;
 pub mod retrieval;
 pub mod retrieval_pg;
 pub mod section;

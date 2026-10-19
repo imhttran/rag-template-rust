@@ -2072,3 +2072,94 @@ path are now verified. Go remains present.
   RUST-008A and RUST-007C were not started.
 - Next executable milestone: `RUST-008A` (browser integration), then RUST-007C
   (Rust-only transition).
+
+## 37. RUST-008A browser integration — verified
+
+Date: 2026-10-19. This section supersedes §36.6: RUST-008A is now verified and
+RUST-007C is the next milestone. Go remains present.
+
+### 37.1 Preflight and scope
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085`; no SOP process was
+  active. RUST-007E was `LOCAL_DONE`/`VERIFIED` and RUST-008A was `PLANNED` with
+  its dependency satisfied.
+- Branch: `rust-008a-browser-integration`, based on the verified RUST-007E
+  commit `60fbad2`. No uncommitted work was discarded.
+- The implementation stayed within RUST-008A: no Go removal, no crate move, no
+  RUST-007C or RUST-008 execution.
+
+### 37.2 Shared services and API
+
+- Extracted `rust/src/query_service.rs` so `bin/query` and the Axum API use the
+  same retrieval, generation, and citation-validation path. `Answer` now carries
+  the cited `ContextPassage` list for structured API sources; the CLI output is
+  unchanged.
+- Added `rust/src/api.rs` and `rust/src/bin/api.rs`: `GET /api/health`,
+  `POST /api/documents/ingest`, `GET /api/documents/{source}/status`, and
+  `POST /api/query`. Ingestion calls `IngestService`; query calls `QueryService`.
+  Synchronous database/Ollama work runs on `spawn_blocking`.
+- Upload validation covers extension, 10 MiB size, empty files, missing names,
+  unexpected fields, and one file per request. Incomplete PDFs return `422` with
+  `incomplete_pages` and write nothing.
+- Added `PgStore::source_status` for ordered chunk/section/page provenance.
+- The API binds `127.0.0.1:8080` by default; `API_URL`, the database DSN, and
+  model credentials stay server-side.
+
+### 37.3 Next.js and browser E2E
+
+- Replaced the mock-only `web/` page with real same-origin `/api/*` calls through
+  the existing Next.js server-side rewrite. Removed the mock module and banner;
+  the UI now shows real health, ingestion status, cited answers, page references,
+  and the loading, empty, connection-failure, extraction-error, and
+  insufficient-evidence states.
+- Added `web/e2e/rag.spec.ts`, `web/playwright.config.ts`, the Playwright dev
+  dependency, and `scripts/web-e2e.sh`. The runner starts Axum + Next.js with a
+  unique corpus and deletes only that corpus.
+- `make web-e2e` → **5 passed** (1.2m, then 18s on a warm model). The real browser
+  verified Markdown upload → cited answer, PDF upload → `Page 2 - p.2`, loading,
+  connection failure, incomplete-PDF extraction, and insufficient evidence. Every
+  `/api/*` request was same-origin `127.0.0.1:3000`; no request reached the Axum
+  port. Screenshots are under
+  `docs/reports/rust-migration/web-e2e/`; the summary is
+  `docs/reference/rust-008a-browser-evidence.md`.
+
+### 37.4 Deterministic verification
+
+- `cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml`
+  → **PASS** (1 test): health, validation, incomplete-PDF no-write, Markdown/PDF/
+  plain-text status, duplicate no-op, cited query whose sources resolve, empty
+  question, and empty-corpus refusal. The test starts the real API binary with a
+  deterministic Ollama server and the dedicated database.
+- `sop validate --cache` → all eight Go/Rust build/test/lint commands **PASS**.
+- Re-ran the affected acceptance crates: `k3_parity`, `ingest_md_text`,
+  `live_rag`, `eval_parity`, `evidence`, and `clean_checkout_go` → all pass.
+- `make web-typecheck` and `make web-build` → pass. Go build/test/vet remain
+  green.
+
+### 37.5 SOP verdict and operator acceptance
+
+- Verify-first `sop run … --max-tasks 1` → `PASSED`; outcome `PARTIAL` with
+  `NEEDS_HUMAN` because criteria 2 and 3 are manual browser evidence. The run did
+  not fabricate acceptance.
+- The operator recorded the evidence-bound acceptance decisions with
+  `sop outcome RUST-008A --accept criterion-2 … --by operator` and the same for
+  `criterion-3`, then approved the human gate with `sop approve RUST-008A`.
+- A resumed verify-first run → `PASS`; `sop verify RUST-008A` → **`VERIFIED`**,
+  validation passed, **`LOCAL_DONE`**. All five criteria are met. The run used
+  0 agent calls and 1 validation run.
+
+### 37.6 Intentional contract differences
+
+- Incomplete PDFs return `422` with `incomplete_pages` and write nothing (the
+  UI-001 draft proposed `200` with readable chunks); the verified pipeline
+  rejects them pre-effect.
+- Added `GET /api/documents/{source}/status`.
+- `top_k` is accepted and validated but the server's `TOP_K`/`FINAL_K` govern
+  retrieval, matching the CLI.
+
+### 37.7 State and next milestone
+
+- `sop status`: RUST-008A `LOCAL_DONE`; RUST-007C `PLANNED`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval-history edit, merge, or auto-merge.
+- Next executable milestone: **RUST-007C** (Rust-only transition and final
+  verification). It was not started; Go remains present.

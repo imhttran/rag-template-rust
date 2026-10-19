@@ -1,9 +1,12 @@
 # UI-001 — Screens and API contracts
 
-Status: prototype contract (UI-001). Records the schemas the UI-002 prototype is
-built against. These are **not** implemented server endpoints yet; the Axum API is
-UI-003 and the real wiring is UI-004. Every response is currently **mock data**
-(see `web/` and the "Mock mode" banner).
+Status: prototype contract (UI-001), implemented by RUST-008A with documented
+differences in [`docs/reference/rust-008a-browser-evidence.md`](../../reference/rust-008a-browser-evidence.md).
+The UI is no longer mock-only.
+
+Records the schemas the UI-002 prototype was built against. Every response is now
+served by the real Axum API (`rust/src/bin/api.rs`); the browser still calls only
+same-origin Next.js `/api/*` endpoints, which the Next.js server proxies.
 
 ## Screens and state transitions
 

@@ -1,8 +1,8 @@
 "use client";
 
-// Prototype status panel. Distinguishes "mock", "not checked", and "unavailable"
-// rather than implying a live probe of the Rust API.
-export type Availability = "mock" | "not-checked" | "up" | "down";
+// Status panel. Reports the real API health probe rather than a simulated
+// availability. "not checked" is shown until the first probe resolves.
+export type Availability = "not-checked" | "up" | "down";
 
 export function SystemStatus({
   api,
@@ -14,7 +14,6 @@ export function SystemStatus({
   model: Availability;
 }) {
   const label: Record<Availability, string> = {
-    mock: "mock",
     "not-checked": "not checked",
     up: "up",
     down: "down",
@@ -27,7 +26,10 @@ export function SystemStatus({
         <div><dt>Database</dt><dd className={`avail ${database}`}>{label[database]}</dd></div>
         <div><dt>Model</dt><dd className={`avail ${model}`}>{label[model]}</dd></div>
       </dl>
-      <p className="hint">Mock mode reports simulated availability; nothing is probed.</p>
+      <p className="hint">
+        Probed through the same-origin `/api/health` endpoint; no credentials are
+        sent to the browser.
+      </p>
     </section>
   );
 }

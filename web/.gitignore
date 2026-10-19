@@ -4,4 +4,6 @@
 next-env.d.ts
 /.run
 /.next-build
+/test-results
+/playwright-report
 *.tsbuildinfo

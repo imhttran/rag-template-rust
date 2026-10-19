@@ -21,6 +21,7 @@ The evidence crate `rust/acceptance/evidence` reads this file from
 | Sweep | `./scripts/sweep.sh` | Rust eval parity harness | Go authoritative, Rust partial |
 | Bilingual export | `cmd/expbilingual` | Rust bilingual contract (`rust/acceptance/bilingual_parity`) | Go authoritative, Rust ported |
 | Migration evidence | this document | `rust/acceptance/evidence` | Frozen |
+| Browser UI | no baseline | Next.js + Axum (`rust/src/bin/api.rs`, `web/`) | RUST-008A verified |
 | Clean checkout | accepted Go checks | `rust/acceptance/clean_checkout_go` | Frozen |
 
 The Makefile keeps the Go targets (`test`, `integration`, `ingest`, `ask`,
@@ -43,7 +44,10 @@ The Makefile keeps the Go targets (`test`, `integration`, `ingest`, `ask`,
   root.
 - The Rust port has no complete replacement for the `scripts/sweep.sh` settings
   matrix.
-- The real Axum/Next.js browser end-to-end flow remains open and is RUST-008A.
+- RUST-008A delivers the real Axum/Next.js browser flow over the shared Rust
+  services; see `RUST-008A-browser-evidence.md` and
+  `rust/acceptance/api_contract`. The Rust-only layout (RUST-007C) and the final
+  Rust-only browser acceptance (RUST-008) remain open.
 - A clean checkout needs both the Go and the Rust toolchains plus `make`.
 
 ## Rollback reference

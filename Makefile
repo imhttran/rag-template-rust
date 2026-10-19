@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-clean-checkout rust-acceptance-k3 rust-acceptance-ingest-md-text rust-acceptance-live-rag rust-acceptance-functional transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
+.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-clean-checkout rust-acceptance-k3 rust-acceptance-ingest-md-text rust-acceptance-live-rag rust-acceptance-functional rust-acceptance-api-contract transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check web-e2e
 # Convenience targets for the ingest/query workflow.
 #
 #   make db-up        start PostgreSQL and apply the schema
@@ -138,6 +138,9 @@ rust-acceptance-ingest-md-text:
 rust-acceptance-live-rag:
 	cargo test --locked --manifest-path rust/acceptance/live_rag/Cargo.toml
 
+rust-acceptance-api-contract:
+	cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml
+
 rust-acceptance-functional: rust-acceptance-k3 rust-acceptance-ingest-md-text
 
 transition-evidence: rust-acceptance-evidence rust-acceptance-clean-checkout
@@ -152,6 +155,11 @@ web-build:
 	./scripts/web-control.sh build
 
 web-check: web-typecheck web-build
+
+# Real-browser E2E for RUST-008A. Starts the Axum API and Next.js, runs
+# Playwright, and cleans up only the run corpus. Needs PostgreSQL and Ollama.
+web-e2e:
+	./scripts/web-e2e.sh
 
 # Everything: the Go reference unit tests, the Rust checks, and the web checks.
 check: test rust-check web-check

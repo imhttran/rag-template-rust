@@ -96,8 +96,36 @@ pub struct PgStore {
     pool: PgPool,
 }
 
+/// One stored section entry in a source-status response.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceSection {
+    /// Section title stored with the chunk.
+    pub section: String,
+    /// Document-global chunk index.
+    pub chunk_index: i32,
+    /// 1-based page, or `None` for a page-less source.
+    pub page: Option<i32>,
+}
+
+/// The stored ingestion status for one `(corpus, source)` pair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceStatus {
+    /// The stored `source` identity.
+    pub source: String,
+    /// The corpus the rows belong to.
+    pub corpus: String,
+    /// The fingerprint stored with every row.
+    pub content_hash: String,
+    /// RFC 3339 timestamp of the stored rows.
+    pub ingested_at: String,
+    /// Number of stored chunks.
+    pub chunks: usize,
+    /// Ordered section/chunk provenance.
+    pub sections: Vec<SourceSection>,
+}
+
 /// A row read back from the `documents` table: the full
-/// [`StoredChunk`](crate::storage::StoredChunk) field set plus the
+/// [`StoredChunk`](crate::storage::StoredChunk) field set plus `id`.
 /// database-assigned `id`.
 ///
 /// `ingested_at` is returned as text (RFC 3339), matching the write side.
@@ -147,6 +175,43 @@ impl PgStore {
         Ok(PgStore {
             pool: create_pool(dsn)?,
         })
+    }
+
+    /// Returns the stored status for one `(corpus, source)` pair, or `None`
+    /// when the source has no rows. Sections are ordered by chunk index so the
+    /// API response preserves document provenance and order.
+    pub fn source_status(
+        &self,
+        corpus: &str,
+        source: &str,
+    ) -> Result<Option<SourceStatus>, PgStoreError> {
+        let mut conn = self.connection()?;
+        let rows = conn
+            .query(
+                "SELECT section, chunk_index, page, content_hash, corpus, ingested_at::text \
+                 FROM documents WHERE corpus = $1 AND source = $2 ORDER BY chunk_index, id",
+                &[&corpus, &source],
+            )
+            .map_err(|err| PgStoreError::Query(err.to_string()))?;
+        if rows.is_empty() {
+            return Ok(None);
+        }
+        let status = SourceStatus {
+            source: source.to_string(),
+            corpus: rows[0].get::<_, Option<String>>(4).unwrap_or_default(),
+            content_hash: rows[0].get::<_, String>(3),
+            ingested_at: rows[0].get::<_, Option<String>>(5).unwrap_or_default(),
+            chunks: rows.len(),
+            sections: rows
+                .iter()
+                .map(|row| SourceSection {
+                    section: row.get::<_, Option<String>>(0).unwrap_or_default(),
+                    chunk_index: row.get::<_, i32>(1),
+                    page: row.get::<_, Option<i32>>(2),
+                })
+                .collect(),
+        };
+        Ok(Some(status))
     }
 
     /// Wraps an existing pool, so callers can share one pool across stores.
