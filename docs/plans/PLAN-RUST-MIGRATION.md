@@ -3,7 +3,7 @@
 Repository: https://github.com/imhttran/rag-template-rust
 Target path: `docs/plans/PLAN-RUST-MIGRATION.md`
 Created: 2026-10-17
-Status: ACTIVE — RUST-001 through RUST-008A verified; RUST-007C and RUST-008 are pending.
+Status: ACTIVE — RUST-001 through RUST-007C verified; RUST-008 is pending.
 
 ## Project
 
@@ -950,10 +950,10 @@ Move the Rust package to the repository root; remove Go source, `go.mod`, `go.su
 
 ### Acceptance Checks
 
-- `cargo build --locked --manifest-path Cargo.toml`
-- `cargo test --locked --manifest-path Cargo.toml`
-- `cargo clippy --locked --all-targets --manifest-path Cargo.toml -- -D warnings`
-- `cargo fmt --manifest-path Cargo.toml --check`
+- `cargo build --locked`
+- `cargo test --locked`
+- `cargo clippy --locked --all-targets`
+- `cargo fmt --check`
 - `cargo test --locked --manifest-path acceptance/final_layout/Cargo.toml`
 - `cargo test --locked --manifest-path acceptance/clean_checkout/Cargo.toml`
 
@@ -965,6 +965,10 @@ Move the Rust package to the repository root; remove Go source, `go.mod`, `go.su
 - criterion 4: check 5
 - criterion 5: check 6
 - criterion 6: check 2
+
+### Execution
+
+- verify-first
 
 ### Work Steps
 

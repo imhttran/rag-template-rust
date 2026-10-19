@@ -1,8 +1,7 @@
 name: CI
 
-# Transition-layout CI: the Go reference and the Rust port are both present
-# during RUST-007B, and the Rust clean-checkout acceptance crate invokes the Go
-# toolchain, so both are installed in the Rust job as well.
+# Rust-only CI. The Go reference was removed by RUST-007C; the frozen Go
+# provenance and fixtures remain in the repository for audit.
 on:
   push:
   pull_request:
@@ -11,51 +10,45 @@ permissions:
   contents: read
 
 jobs:
-  go-reference:
-    name: Go reference
+  rust:
+    name: Rust build, tests, and final layout
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: rag
+          POSTGRES_PASSWORD: rag
+          POSTGRES_DB: rag_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://rag:rag@127.0.0.1:5432/rag_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Build
-        run: go build ./...
-      - name: Test
-        run: go test ./...
-      - name: Vet
-        run: go vet ./...
-      - name: Format check
-        run: test -z "$(gofmt -l .)"
-
-  rust-transition:
-    name: Rust port and transition evidence
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # The clean-checkout acceptance crate runs the documented sequence, which
-      # includes `go build`, `go test`, and `go vet`.
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      # rustup honors rust/rust-toolchain.toml and installs the pinned channel.
+      # rustup honors rust-toolchain.toml at the repository root.
       - name: Install pinned Rust toolchain
         run: rustup show
-        working-directory: rust
+      - name: Apply migrations
+        run: |
+          for f in migrations/*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
       - name: Format check
-        run: cargo fmt --manifest-path rust/Cargo.toml --check
+        run: cargo fmt --check
       - name: Build
-        run: cargo build --locked --manifest-path rust/Cargo.toml
+        run: cargo build --locked
       - name: Test
-        run: cargo test --locked --manifest-path rust/Cargo.toml
+        run: cargo test --locked
       - name: Clippy
-        run: cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
-      - name: Transition evidence
-        run: make rust-acceptance-evidence
-      - name: Clean checkout with Go present
-        run: make rust-acceptance-clean-checkout
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Final layout and clean checkout without Go
+        run: make transition-evidence
 
   api-contract:
     name: Axum API contract
@@ -80,7 +73,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install pinned Rust toolchain
         run: rustup show
-        working-directory: rust
       - name: Apply migrations
         run: |
           for f in migrations/*.sql; do

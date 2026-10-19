@@ -16,17 +16,20 @@ Go reference; no fixture was regenerated from Rust.
 | `EXPAND_LIMIT` | `20` |
 | `MIN_SIMILARITY` | `0.6` |
 | Rewrite / lexical rerank / LLM rerank / answerability gate / fact judge | off |
-| Acceptance crate | `rust/acceptance/k3_parity` |
-| Ranking reference tool | `tools/rankdump` (Go, evaluation-only) |
+| Acceptance crate | `acceptance/k3_parity` |
+| Ranking reference | `fixtures/parity/frozen/k3_rankdump_go_stdout.txt` (frozen from the pinned Go reference) |
 
-`cmd/eval` emits `K=1,2,TOP_K`, so `TOP_K=3` makes it emit the K=3 line directly.
-K=4 output is not used for this evidence.
+The captured Go output used `TOP_K=3`, `FINAL_K=3`; Go's `cmd/eval` emits
+`K=1,2,TOP_K`, so the K=3 line is direct. K=4 output is not used for this
+evidence.
 
 ## Comparison
 
-The crate runs the real Go `cmd/ingest`, `cmd/eval`, and `tools/rankdump` and the
-production Rust `eval` against the same PostgreSQL corpus and deterministic
-embeddings. It compares:
+The crate ingests the dataset with the production Rust `ingest` binary and runs
+the production Rust `eval` against the PostgreSQL corpus with deterministic
+embeddings. It compares the Rust output with the frozen Go outputs
+(`fixtures/parity/frozen/eval_k3_go_stdout.txt` and
+`k3_rankdump_go_stdout.txt`). No Go toolchain is required. It compares:
 
 - case count and question order (exact);
 - per-case K=3 recall and precision (absolute tolerance `0.005`, one printed
@@ -38,7 +41,7 @@ embeddings. It compares:
 
 ## Result
 
-`cargo test --locked --manifest-path rust/acceptance/k3_parity/Cargo.toml` →
+`cargo test --locked --manifest-path acceptance/k3_parity/Cargo.toml` →
 **PASS** (1 test). Ranking order, tie ordering, per-case metrics, and aggregate
 metrics match the Go reference.
 

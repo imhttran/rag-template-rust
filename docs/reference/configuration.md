@@ -4,7 +4,7 @@ All three commands read the same settings from the environment. The defaults
 work with the bundled `docker-compose.yml` and a local Ollama.
 
 `.env.example` lists every setting; copy it to `.env` and load it into your
-shell (Go does not read `.env` files on its own):
+shell (The binaries read the process environment, not `.env`, on their own):
 
 ```bash
 cp .env.example .env
@@ -46,8 +46,8 @@ set -a; source .env; set +a
 | `EVAL_REWRITE_ONLY`       | `false`                                                 | eval           |
 | `QUESTION`                | _(none — pass it as an argument, or type it)_           | rag            |
 
-`all` = every command; `rag` = `cmd/rag` only; `eval` = `cmd/eval` only;
-`ingest` = `cmd/ingest` only; `rag, eval` = both commands.
+`all` = every command; `rag` = `src/bin/query.rs` only; `eval` = `src/bin/eval.rs` only;
+`ingest` = `src/bin/ingest.rs` only; `rag, eval` = both commands.
 
 ### Post-gap-closure settings
 
@@ -57,14 +57,14 @@ Each defaults to the pre-change behaviour, so an unset value changes nothing:
 - **`CORPUS_LANGUAGE`** (`ingest`, `rag`) — BCP-47 tag selecting the PostgreSQL
   full-text search configuration for keyword retrieval and stored per document.
   Empty (default) keeps `english`; a supported language uses its configuration;
-  an unsupported one falls back to `simple` (see `internal/retrieval.NormalizeFTSConfig`).
+  an unsupported one falls back to `simple` (see `src/retrieval` normalization).
 - **`CONTEXT_BUDGET`** (`rag`) — byte-based cap on the context sent to the model.
   `0` (default) keeps the chunk-count behaviour. See
-  [`internal/contextbudget`](../../internal/contextbudget).
+  [`src/answer/context_budget.rs`](../../src/answer/context_budget.rs).
 - **`RAG_CITATION_VALIDATION`** (`rag`) — validates the model's `[source - section]`
   citations against the retrieved documents and repairs an answer whose citations
   do not resolve (one bounded re-prompt, then strip). Off by default; when off the
-  answer path is unchanged. See [`internal/citations`](../../internal/citations).
+  answer path is unchanged. See [`src/answer/citation.rs`](../../src/answer/citation.rs).
 - **`MAX_QUESTION_BYTES` / `MAX_INPUT_BYTES`** (`rag`) — fail-fast size limits for
   the question and the assembled retrieved context. `0` (default) disables each
   check; an oversized input errors before any model call, naming the variable.
@@ -74,18 +74,18 @@ Each defaults to the pre-change behaviour, so an unset value changes nothing:
 - **`OBSERVABILITY_FORMAT`** (`rag`) — `human` (default) keeps the existing stage
   output; `json` emits one correlated `log/slog` record per run with a run ID,
   stage timings, retrieved/filtered counts, and context usage. See
-  [`internal/observability`](../../internal/observability).
+  the Rust CLI/API (no separate reporter).
 - **`EMBED_PROVIDER` / `GEN_PROVIDER`** (`all`) — provider-registry selectors
-  (`ollama` by default), **honoured by the commands**: `cmd/ingest`, `cmd/rag`, and
-  `cmd/eval` resolve the embedder/generator through
-  `config.Config.Embedder()` / `Generator()` (dispatching via `internal/provider`)
+  (`ollama` by default), **honoured by the commands**: `src/bin/ingest.rs`, `src/bin/query.rs`, and
+  `src/bin/eval.rs` resolve the embedder/generator through
+  `config.Config.Embedder()` / `Generator()` (dispatching via `src/provider.rs`)
   rather than constructing a vendor client directly. An **unregistered name fails
   fast at `config.Load`** with an error naming the variable and the value — it is
   never silently ignored. `GEN_PROVIDER` is consulted only when a generator is
-  actually built (`cmd/rag` always; `cmd/eval` only when `EVAL_ANSWERABILITY_GATE`,
+  actually built (`src/bin/query.rs` always; `src/bin/eval.rs` only when `EVAL_ANSWERABILITY_GATE`,
   `EVAL_FACT_JUDGE`, `EVAL_LLM_RERANK`, or `QUERY_REWRITE` is enabled). Only
   `ollama` is registered today; adding another provider means registering a
-  constructor in [`internal/provider`](../../internal/provider).
+  constructor in [`src/provider.rs`](../../src/provider.rs).
 
 `EMBED_DIM` must match the stored `documents.embedding` column. The guard
 `ingestion.CheckEmbeddingDim` fails fast otherwise and points at

@@ -31,10 +31,10 @@ export REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-180s}"
 
 echo "web-e2e: corpus $CORPUS"
 echo "web-e2e: building the API"
-cargo build --locked --manifest-path rust/Cargo.toml --bin api
+cargo build --locked --bin api
 
 api_log=$(mktemp)
-API_HOST=127.0.0.1 API_PORT="$API_PORT" rust/target/debug/api >"$api_log" 2>&1 &
+API_HOST=127.0.0.1 API_PORT="$API_PORT" target/debug/api >"$api_log" 2>&1 &
 API_PID=$!
 
 cleanup() {

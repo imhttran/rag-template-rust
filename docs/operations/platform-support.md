@@ -16,48 +16,47 @@ Support is stated explicitly as one of:
 
 | Platform | Status | Notes |
 | --- | --- | --- |
-| **Linux** (incl. Linux Mint) | **Verified** | `go build`/`go test`, `docker compose`, POSIX `sh` scripts, `make`, `psql` |
+| **Linux** (incl. Linux Mint) | **Verified** | `cargo build --locked`/`cargo test --locked`, `docker compose`, POSIX `sh` scripts, `make`, `psql` |
 | **macOS** | Expected (untested) | Same POSIX toolchain; Docker Desktop; not exercised here |
 | **Windows (native)** | **Gap** | No native `make`/`sh`; see Windows section |
 | **Windows via WSL2** | Expected (untested) | Recommended Windows path (Ubuntu + Docker Desktop + Ollama) |
 
-The Go code is portable: the module has **no cgo** and no OS-specific syscalls, and its only
-non-standard dependencies are `github.com/jackc/pgx/v5` (pure Go) and
-`github.com/ledongthuc/pdf` (pure-Go PDF text layer). So there is no platform-specific C toolchain
-to install.
+The Rust code is portable: the package has no cgo/Go dependency and uses the
+cross-platform `postgres`/`r2d2` and `lopdf` crates. The pinned Rust toolchain is
+installed by rustup; no platform-specific Go toolchain is required.
 
 ## macOS
 
 - **Status:** Expected (untested).
-- **Prerequisites:** Go (**≥ 1.26**, see below); Docker Desktop (bundled PostgreSQL + pgvector)
-  or a local PostgreSQL with the `vector` extension; Ollama for ingest/answer; `make`, a POSIX
-  `sh`, `psql`, and `jq` (`fmt-json`).
+- **Prerequisites:** the Rust toolchain pinned in `rust-toolchain.toml`; Docker Desktop (bundled
+  PostgreSQL + pgvector) or a local PostgreSQL with the `vector` extension; Ollama for
+  ingest/answer; `make`, a POSIX `sh`, `psql`, and `jq` (`fmt-json`).
 - **Notes:** The toolchain (`sh`, `make`, `psql`, `docker compose`) is native on macOS. No
   repository-specific macOS step is known.
 
 ## Linux (including Linux Mint)
 
 - **Status:** **Verified** (this environment).
-- **Prerequisites:** Go (**≥ 1.26**); Docker + Docker Compose (or a local PostgreSQL with
-  `vector`); Ollama for ingest/answer; `make`, POSIX `sh`, `psql`, `jq`.
+- **Prerequisites:** the Rust toolchain pinned in `rust-toolchain.toml`; Docker + Docker Compose
+  (or a local PostgreSQL with `vector`); Ollama for ingest/answer; `make`, POSIX `sh`, `psql`,
+  `jq`.
 - **Notes:** Linux Mint is Ubuntu/Debian-based; the Debian/Ubuntu packages (`golang-go`,
   `docker.io`/Docker CE, `postgresql-client` for `psql`, `jq`, `make`) satisfy the prerequisites.
-  Verified here: `go build ./...`, `go test ./...`, `docker compose` config, the `sh` scripts, the
+  Verified here: `cargo build --locked`, `cargo test --locked`, `docker compose` config, the `sh` scripts, the
   `Makefile`, and `psql`.
 
 ## Windows (native)
 
 - **Status:** **Gap — not supported as-is.**
 - **Limitations (evidence-based):**
-  - `scripts/eval-model-sweep.sh` and `scripts/sweep.sh` start with `#!/bin/sh` and are POSIX
-    shell; `Makefile` targets (`make test`, `make db-up`, `make integration`, …) shell out to
+  - The Makefile targets (`make test`, `make db-up`, `make rust-check`, …) shell out to
     `sh`, `docker compose`, `git`, `jq`, and `psql` — none of which is native to `cmd.exe`/
     PowerShell.
   - `make db-schema` invokes `psql "$DATABASE_URL"` — the PostgreSQL client is required.
-- **What does work natively:** `go build ./...` and `go test ./...` run with the Go toolchain on
-  Windows; the Docker Desktop engine can run `pgvector/pgvector:pg17`.
-- **Do not assume** the shell/Makefile workflow, the sweep scripts, or the disposable-database
-  integration commands work on native Windows without WSL2 or Git-Bash.
+- **What does work natively:** `cargo build --locked` and `cargo test --locked` run with the
+  Rust toolchain on Windows; the Docker Desktop engine can run `pgvector/pgvector:pg17`.
+- **Do not assume** the shell/Makefile workflow or the disposable-database test commands work
+  on native Windows without WSL2 or Git-Bash.
 
 ## Windows via WSL2 (recommended for Windows)
 
@@ -70,11 +69,11 @@ to install.
 
 ## Shared requirements
 
-### Go toolchain
-- `go.mod` declares **`go 1.26.0`**; use **Go ≥ 1.26**.
-- The repo is built/tested with the Go toolchain auto-selection (`GOTOOLCHAIN`); a **newer patch
-  toolchain** may be needed for a clean `govulncheck` (the RAG-024/RAG-023 validation used
-  `GOTOOLCHAIN=go1.27.2`). Pin it explicitly for reproducible vulnerability scans.
+### Rust toolchain
+- The channel and components are pinned in `rust-toolchain.toml`; rustup installs them on
+  first use.
+- Use `cargo build --locked` / `cargo test --locked` for reproducible builds against the
+  committed `Cargo.lock`.
 
 ### PostgreSQL + pgvector
 - A PostgreSQL 16/17 server **with the `vector` (pgvector) extension** (0.6+).
@@ -118,20 +117,18 @@ to install.
 Run from the repository root. These are the checks used to classify the platforms above.
 
 ```sh
-# Go build and the standard (no-DB, no-network) suite — any platform with Go ≥ 1.26
-go build ./...
-go test ./...
+# Rust build and the standard (no-DB, no-network) suite
+cargo build --locked
+cargo test --locked
 
-# Same, pinned to the toolchain used for RAG-024/025 validation
-GOTOOLCHAIN=go1.27.2 go build ./... && GOTOOLCHAIN=go1.27.2 go test ./...
-
-# Database-backed integration (Linux/macOS/WSL2; needs Docker or a local PG+pgvector)
+# Database-backed tests (Linux/macOS/WSL2; needs Docker or a local PG+pgvector)
 make db-up            # docker compose up -d --wait && make db-schema
-RAG_INTEGRATION=1 go test ./internal/retrieval/ ./internal/ingestion/ -run Integration -p 1 -v
-RAG_TEST_DATABASE_URL='postgres://rag:rag@127.0.0.1:5434/<disposable>?sslmode=disable' \
-  RAG_INTEGRATION=1 go test ./internal/rag/ -run DBIntegration -count=1 -v
+cargo test --locked --test ingest_binary --test section_chunks_pg --test storage_interop -- --test-threads=1
+
+# Full gates
+make rust-check
 
 # Formatting / hygiene
-gofmt -l .
+cargo fmt --check
 git diff --check
 ```

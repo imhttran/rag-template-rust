@@ -2163,3 +2163,91 @@ RUST-007C is the next milestone. Go remains present.
 - No `state.db` edit, budget reset, approval-history edit, merge, or auto-merge.
 - Next executable milestone: **RUST-007C** (Rust-only transition and final
   verification). It was not started; Go remains present.
+
+## 38. RUST-007C Rust-only transition — verified
+
+Date: 2026-10-19. This section supersedes §37.7: RUST-007C is verified, the Go
+implementation is gone, and RUST-008 is the only remaining plan task.
+
+### 38.1 Preflight
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085`; no SOP process was
+  active. RUST-007B, RUST-007E, and RUST-008A were `LOCAL_DONE`/`VERIFIED`;
+  RUST-007C was `PLANNED` with all dependencies satisfied.
+- Branch: `rust-007c-rust-only`, based on the verified RUST-008A commit
+  `7c3c3e1623622f546f0a886ac5078ecbbeb600b8`.
+
+### 38.2 Final layout and Go removal
+
+- Moved the Cargo package to the repository root: `Cargo.toml`, `Cargo.lock`,
+  `rust-toolchain.toml`, `src/`, `tests/`, `fixtures/`, and `acceptance/`.
+  Updated acceptance `repo_root()` calculations, binary paths, fixture paths,
+  and test working directories.
+- Removed `cmd/`, `internal/`, `go.mod`, `go.sum`, `tools/` (including the Go
+  fixture generator, interop helper, and K=3 rank dump), the Go sweep scripts,
+  the Go interop test directions, and `acceptance/clean_checkout_go`.
+- The Rust package provides every command (`ingest`, `query`, `eval`,
+  `expbilingual`, `api`), the shared services, the Axum API, and the Next.js UI.
+- No `.go` file remains. `migrations/`, `evals/`, `examples/`,
+  `docker-compose.yml`, `fixtures/`, and the historical evidence under
+  `docs/reports/rust-migration/` are preserved.
+
+### 38.3 Frozen Go reference outputs
+
+- Before removing Go, captured the pinned reference outputs into
+  `fixtures/parity/frozen/`: K=3 and K=4 `cmd/eval` stdout, the K=3 ranking dump,
+  the bilingual `ARM=all` and `ARM=B,C,E` stdout, and both query caches.
+- Rewrote `acceptance/eval_parity`, `acceptance/k3_parity`, and
+  `acceptance/bilingual_parity` to ingest with the production Rust `ingest` and
+  compare the Rust commands against those frozen outputs. No expected value is
+  generated from Rust. The bilingual footer normalizes the dynamic `wall=` and
+  `cache=` tokens.
+- Added `acceptance/final_layout` (root layout, no Go files/tooling, preserved
+  provenance/assets, Rust-only Makefile/hooks/CI) and
+  `acceptance/clean_checkout` (copy the tree, remove Go from `PATH`, run
+  `cargo build --locked`, `cargo test --lib`, and the section/chunk parity test).
+
+### 38.4 Tooling and documentation
+
+- Makefile is Rust-only: `cargo build/test/fmt/clippy`, the acceptance targets,
+  `web-*`, and the explicit `web-e2e` target. The Go `integration`/`sweep`
+  targets and scripts are gone.
+- Hooks run Rust fmt, evidence, final-layout, web typecheck, build/test/clippy,
+  clean checkout, and the web build; no Go commands.
+- CI has `rust` (pgvector service, fmt/build/test/clippy, final layout/clean
+  checkout), `api-contract`, and `web` jobs; the Go job is gone.
+- Updated README, command reference, usage, architecture, project structure,
+  capability/configuration/testing references, platform support, editor
+  verification, and the transition evidence for the root Rust-only layout.
+
+### 38.5 SOP verification and command-policy repair
+
+- Two verify-first attempts stopped at setup blockers because the installed
+  command policy rejected `cargo clippy … -- -D warnings` and
+  `cargo fmt --manifest-path Cargo.toml --check` on the acceptance path. The
+  acceptance checks were changed to the authorizable root forms
+  `cargo clippy --locked --all-targets` and `cargo fmt --check`. The configured
+  validation still runs Clippy with `-D warnings` and the fmt check, so no
+  criterion was weakened.
+- The verify-first run then passed: `sop verify RUST-007C` → **`VERIFIED`**,
+  validation passed, **`LOCAL_DONE`**; all six criteria met; 0 agent calls, one
+  validation run, 0 fix cycles.
+
+### 38.6 Verification results
+
+- Root: `cargo fmt --check`, `cargo build --locked`, `cargo test --locked`
+  (216 library tests plus integration/doc tests), and
+  `cargo clippy --locked --all-targets -- -D warnings` all pass.
+- Acceptance: `final_layout` (5), `clean_checkout` (1), `evidence` (5),
+  `api_contract` (1), `k3_parity` (1), `eval_parity` (1), `ingest_md_text` (1),
+  `bilingual_parity` (1), `e2e` (2), `live_rag` (2), `ingest_cli` (2), and
+  `retrieval_cli` (9) pass. The live checks use real Ollama and PostgreSQL.
+- Web: `make web-typecheck`, `make web-build`, and `make web-e2e` pass (5
+  browser tests). The Axum API and CLI binaries build from the root package.
+
+### 38.7 State and next milestone
+
+- `sop status`: RUST-007C `LOCAL_DONE`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval-history edit, merge, or auto-merge.
+- Next executable milestone: **RUST-008** (final Rust-only browser acceptance).
+  RUST-007C is complete; Go no longer exists in the repository.

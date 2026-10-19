@@ -41,66 +41,62 @@ This procedure is never applied by `make db-schema`, `make db-up`, or the
 `docker-entrypoint-initdb.d` mount in `docker-compose.yml`, because it is not
 under `migrations/*.sql`.
 
-## Clean checkout with Go present
+## Clean checkout (Rust-only)
 
-The Go reference implementation and the Rust port (`rust/Cargo.toml`) coexist in
-this repository. Go stays present: do not remove `cmd/`, `internal/`, or `go.mod`.
-A clean checkout needs both toolchains installed (Go 1.26 or newer, and the Rust
-toolchain pinned by `rust/rust-toolchain.toml`) plus `make`. Copy the checkout
-without `.git`, `target/`, or `node_modules/`, then run the documented steps:
+The Cargo package is at the repository root; Go is not required. A clean checkout
+needs the Rust toolchain pinned by `rust-toolchain.toml`, plus `make` for the
+convenience targets. Copy the checkout without `.git`, `target/`, or
+`node_modules/`, then run:
 
 ```bash
-go build ./...
-go test ./...
-go vet ./...
-make rust-test
+cargo build --locked
+cargo test --locked
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
 ```
 
 The transition record, including the capability matrix and the rollback
 reference, is
 [`docs/reference/rust-transition-evidence.md`](../reference/rust-transition-evidence.md).
-The frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`)
-are shared by both toolchains and are not modified.
+The frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`,
+`fixtures/`) are read-only and are not modified.
 
-`DATABASE_URL` must point at a reachable pgvector database for the Rust suite.
-A local `.env` is developer state and is not part of a clean checkout; export the
-variable in the shell, or keep `.env` beside the checkout you copied from. The
-RUST-007B clean-checkout harness reads the source checkout's `.env` and passes its
-values to the documented steps without copying the file.
+`DATABASE_URL` must point at a reachable pgvector database for the database-backed
+tests. A local `.env` is developer state and is not part of a clean checkout; export
+the variable in the shell. The `acceptance/clean_checkout` test verifies the build
+and non-database tests with Go absent from `PATH`.
 
 ## Ingest
 
 Chunk a document, embed each chunk, and store it:
 
 ```bash
-go run ./cmd/ingest examples/loan-policy.md
+cargo run --locked --bin ingest examples/loan-policy.md
 ```
 
-The corpus is markdown; each `## section` is split into overlapping ~100-word
-chunks stored with their `source`, `section`, and `chunk_index` for citations.
-Output:
+PDF, Markdown (`.md`/`.markdown`), and plain text (`.txt`) are supported. The
+Markdown loader splits each `## section` into overlapping ~100-word chunks stored
+with their `source`, `section`, and `chunk_index` for citations. Output:
 
 ```text
-Ingested 6 chunks from loan-policy.md.
+ingested loan-policy.md: 6 chunk(s) replaced
 ```
 
-Re-running replaces that file's stored chunks, so the store never accumulates
-duplicates.
+Re-running an unchanged file reports `unchanged` and leaves the stored rows in
+place; a changed file replaces that source's chunks transactionally.
 
 ## Query
 
 Ask a question:
 
 ```bash
-go run ./cmd/rag "What happens if someone misses a payment?"
+cargo run --locked --bin query "What happens if someone misses a payment?"
 ```
 
-The question can also come from the `QUESTION` setting, or be typed at the prompt
-when the command is run with no argument:
+The question can also come from the `QUESTION` setting when no argument is given:
 
 ```bash
-QUESTION="What happens if someone misses a payment?" go run ./cmd/rag
-go run ./cmd/rag   # prompts: Question:
+QUESTION="What happens if someone misses a payment?" cargo run --locked --bin query
 ```
 
 Output (scores and the answer vary by model and data):

@@ -18,7 +18,7 @@ row in the run-owned corpus.
 | Database | dedicated PostgreSQL 16 `rag_migration_test` on `127.0.0.1:5432` |
 | pgvector | `0.6.0` |
 | Corpus | `rust-007e-live-46114-1792431976910637237` (unique, deleted after the run) |
-| Binaries | `rust/target/debug/ingest`, `rust/target/debug/query` (production binaries) |
+| Binaries | `target/debug/ingest`, `target/debug/query` (production binaries) |
 
 ## Configuration
 
@@ -42,20 +42,20 @@ row in the run-owned corpus.
 The acceptance test drove the production binaries directly:
 
 ```bash
-cargo build --locked --manifest-path rust/Cargo.toml --bin ingest
-cargo build --locked --manifest-path rust/Cargo.toml --bin query
+cargo build --locked --bin ingest
+cargo build --locked --bin query
 
 # Markdown
-rust/target/debug/ingest examples/loan-policy.md        # RAG_SOURCE=live-policy.md
+target/debug/ingest examples/loan-policy.md        # RAG_SOURCE=live-policy.md
 # PDF (two-page text layer)
-rust/target/debug/ingest rust/fixtures/parity/inputs/text-layer.pdf  # RAG_SOURCE=live-text-layer.pdf
+target/debug/ingest fixtures/parity/inputs/text-layer.pdf  # RAG_SOURCE=live-text-layer.pdf
 # Plain text
-rust/target/debug/ingest <tmp>/rust-007e-note.txt       # RAG_SOURCE=live-note.txt
+target/debug/ingest <tmp>/rust-007e-note.txt       # RAG_SOURCE=live-note.txt
 
-rust/target/debug/query "What happens if someone misses a payment?"
-rust/target/debug/query "What text appears on page two of the PDF document?"
-rust/target/debug/query "What is the RUST-007E support code?"
-rust/target/debug/query "What is the RUST-007E support code?"   # empty corpus
+target/debug/query "What happens if someone misses a payment?"
+target/debug/query "What text appears on page two of the PDF document?"
+target/debug/query "What is the RUST-007E support code?"
+target/debug/query "What is the RUST-007E support code?"   # empty corpus
 ```
 
 All commands ran with the configuration in the table above. The acceptance

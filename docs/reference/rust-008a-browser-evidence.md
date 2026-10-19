@@ -47,7 +47,7 @@ thread.
 ## Deterministic API contract
 
 ```bash
-cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml
+cargo test --locked --manifest-path acceptance/api_contract/Cargo.toml
 ```
 
 Result: **PASS** (1 test). It starts the real `api` binary against a dedicated
@@ -104,8 +104,8 @@ through SOP.
 
 ## Verification
 
-- `cargo test --locked --manifest-path rust/Cargo.toml` — Rust suite
-- `cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml` — contract
+- `cargo test --locked` — Rust suite
+- `cargo test --locked --manifest-path acceptance/api_contract/Cargo.toml` — contract
 - `go build ./...`, `go test ./...`, `go vet ./...` — Go reference
 - `make web-typecheck`, `make web-build` — Next.js typecheck and production build
 - `make web-e2e` — real browser suite

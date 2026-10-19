@@ -1,15 +1,15 @@
 # Rust editor verification (RUST-002)
 
 This report records the verification of the Zed integrated experience for the
-Rust foundation (`rust/`). Each check is listed with its observed result.
+Rust foundation (the repository root). Each check is listed with its observed result.
 Checks that could not be observed because the user's desktop GUI was unavailable
 are recorded as **pending manual verification** — never as a success.
 
 ## Environment
 
-- Crate: `rust/` (`rag-foundation`, library `rag_foundation`).
-- Pinned toolchain: `1.83.0` with `rustfmt`, `clippy`, `rust-src`,
-  `lldb-preview` (`rust/rust-toolchain.toml`).
+- Crate: the repository root (`rag-foundation`, library `rag_foundation`).
+- Pinned toolchain: `1.99.1` with `rustfmt`, `clippy`, `rust-src`, and
+  `rust-analyzer` (`rust-toolchain.toml`).
 - Zed configuration: additive Rust entries in `.zed/settings.json`;
   pre-existing `agent` settings preserved verbatim.
 
@@ -24,7 +24,7 @@ are recorded as **pending manual verification** — never as a success.
 | Format-on-save | pending manual verification | Config entry added (`format_on_save: "on"` for Rust); GUI confirmation pending. |
 | Temporary Clippy diagnostic | pending manual verification | A temporary lint issue was to be introduced and removed in a GUI session; not performed in this environment. Clean lint state confirmed by `cargo clippy -- -D warnings`. |
 | Unit test run from Zed | pending manual verification | Tests run successfully via `cargo test`; GUI-invoked run pending. |
-| Debugging smoke check | pending manual verification | Requires `lldb-preview` in a GUI session; desktop access unavailable. |
+| Debugging smoke check | pending manual verification | Requires a GUI debugger session; desktop access unavailable in this environment. |
 
 ## Platform status
 

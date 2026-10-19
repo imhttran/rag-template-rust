@@ -1,88 +1,40 @@
 #!/bin/sh
-# Pre-commit checks for this repo.
+# Pre-commit checks for this Rust-only repository.
 #
 # Enabled with:  git config core.hooksPath .githooks
 # Bypass once:   git commit --no-verify
 #
-# Requires staticcheck on PATH:  brew install staticcheck
-# Requires jq on PATH for the json check:  brew install jq
-# Optional: govulncheck on PATH for the vulnerability scan:
-#   go install golang.org/x/vuln/cmd/govulncheck@latest
-#
-# Each step runs in order and the commit is aborted if any of them fails.
+# Requires jq on PATH for the JSON syntax check. The Makefile targets are the
+# single source of truth for the Rust and web checks.
 set -e
 
 # Load the repository .env (if present) so database checks get DATABASE_URL
 # without repeated manual exports. Values are never printed.
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
-# Read-only formatting/module checks: hooks must never modify source files.
-# `go mod tidy -diff` and `gofmt -l` report what would change and exit non-zero
-# instead of rewriting.
-echo "pre-commit: go mod tidy -diff"
-go mod tidy -diff
-
-echo "pre-commit: gofmt -l . (read-only formatting check)"
-unformatted=$(gofmt -l .)
-if [ -n "$unformatted" ]; then
-	echo "pre-commit: these files are not gofmt-formatted:" >&2
-	printf '%s\n' "$unformatted" >&2
-	exit 1
-fi
-
 # Every tracked JSON file is validated here rather than at push time: a broken
 # evals/retrieval.json or .zed/settings.json still compiles and only fails when
 # the command that reads it runs.
-#
-# `jq empty` rather than `jq -e .`: -e counts a document that is legitimately null
-# or false as a failure. empty exits 0 for any valid JSON and 5 for invalid.
 if command -v jq >/dev/null 2>&1; then
 	echo "pre-commit: jq (json syntax)"
-
 	for file in $(git ls-files -- '*.json'); do
 		if ! jq empty "$file"; then
-			echo "pre-commit: $file is not valid json"
-
+			echo "pre-commit: $file is not valid json" >&2
 			exit 1
 		fi
 	done
 else
-	echo "pre-commit: jq not found, skipping json syntax check (brew install jq)"
+	echo "pre-commit: jq not found, skipping json syntax check (install jq)"
 fi
 
-echo "pre-commit: go vet ./..."
-go vet ./...
-
-echo "pre-commit: staticcheck ./..."
-staticcheck ./...
-
-# Vulnerability scan of the dependency set. govulncheck is a local-only developer
-# tool that may not be installed, so it is skipped with an actionable hint rather
-# than failing the commit when it is absent.
-if command -v govulncheck >/dev/null 2>&1; then
-	# Scan with the patched stdlib toolchain (GO-2026-6617/6613 are fixed only in
-	# go1.27.2). The rest of the hook keeps the default toolchain so the prebuilt
-	# staticcheck (older export-data reader) still works.
-	echo "pre-commit: govulncheck ./... (GOTOOLCHAIN=go1.27.2)"
-	GOTOOLCHAIN=go1.27.2 govulncheck ./...
-else
-	echo "pre-commit: govulncheck not found, skipping the vulnerability scan"
-	echo "           install it with: go install golang.org/x/vuln/cmd/govulncheck@latest"
-fi
-
-echo "pre-commit: go test ./..."
-go test ./...
-
-echo "pre-commit: go build ./..."
-go build ./...
-
-# Rust and web checks. Go stays in the repository until RUST-007; the Go checks
-# above remain. The Makefile targets are the single source of truth.
 echo "pre-commit: make rust-fmt"
 make rust-fmt
 
 echo "pre-commit: make rust-acceptance-evidence"
 make rust-acceptance-evidence
+
+echo "pre-commit: make rust-acceptance-final-layout"
+make rust-acceptance-final-layout
 
 echo "pre-commit: make web-check-env"
 make web-check-env

@@ -1,16 +1,16 @@
 # RAG Learning Project
 
-A small Go project for learning Retrieval-Augmented Generation (RAG) from first
+A Rust project for learning Retrieval-Augmented Generation (RAG) from first
 principles. It chunks a document, embeds the chunks with a local Ollama server,
 stores them in PostgreSQL with pgvector, retrieves the closest chunks for a
 question, and asks a local model to answer using only those chunks. Separate
 commands score retrieval quality and run a bilingual evaluation harness.
 
-Four commands drive it — `cmd/ingest` loads a document (PDF, Markdown, or plain
-text), `cmd/rag` answers a
-question, `cmd/eval` scores retrieval, and `cmd/expbilingual` runs the RAG-024
-bilingual evaluation arms. The full list, including the `make` shortcuts, is in
-the [command reference](docs/reference/commands.md).
+Four CLI commands drive it — `ingest` loads a document (PDF, Markdown, or plain
+text), `query` answers a question with cited evidence, `eval` scores retrieval,
+and `expbilingual` runs the RAG-024 bilingual evaluation arms. The Axum `api`
+binary serves the Next.js browser UI. The full list, including the `make`
+shortcuts, is in the [command reference](docs/reference/commands.md).
 
 ## Architecture
 
@@ -26,21 +26,24 @@ flowchart TD
     search --> filter[Filter by MIN_SIMILARITY]
     filter --> ctx[Build context]
     ctx --> answer[Answer with local model]
+    browser[Next.js UI] --> api[Axum API]
+    api --> chunk
+    api --> answer
 ```
 
 Retrieval is hybrid: vector search and PostgreSQL full-text search are fused with
 reciprocal rank fusion, the top sections are deduplicated and expanded, and an
 optional answerability gate decides whether the evidence can answer at all. The
 embedder and generator are resolved through a provider registry (`EMBED_PROVIDER`
-/ `GEN_PROVIDER`); an unregistered provider fails fast at `config.Load` and only
-`ollama` is registered today. See the
+/ `GEN_PROVIDER`); an unregistered provider fails fast at configuration load and
+only `ollama` is registered today. See the
 [architecture overview](docs/architecture/OVERVIEW.md) for the full picture.
 
 ## Requirements
 
-- Go 1.26 or newer (the module's `go` directive is `go 1.26.0`). For a clean
-  `govulncheck ./...`, use a current patch toolchain — this repository's validation
-  used `GOTOOLCHAIN=go1.27.2`.
+- Rust, using the channel pinned in [`rust-toolchain.toml`](rust-toolchain.toml).
+  With `rustup` installed, the pinned toolchain and components install
+  automatically when you run `cargo` in this repository.
 - Ollama running locally, with an embedding model and a chat model:
 
   ```bash
@@ -63,8 +66,8 @@ make eval
 ```
 
 Every setting is read from the environment; [`.env.example`](.env.example) lists
-them all. Copy it to `.env` and load it into your shell (Go does not read `.env`
-files on its own):
+them all. Copy it to `.env` and load it into your shell (the binaries read the
+process environment, not `.env` directly):
 
 ```bash
 cp .env.example .env
@@ -78,27 +81,26 @@ setup details, see the [usage guide](docs/guides/usage.md).
 
 | Command | What it does | Make target |
 | ------- | ------------ | ----------- |
-| `cmd/ingest <file>` | Chunk a file and store its embeddings (safe to re-run) | `make ingest FILE=…` |
-| `cmd/rag "question"` | Answer a question from the stored chunks | `make ask Q="…"` |
-| `cmd/eval` | Score retrieval against `evals/retrieval.json` | `make eval` |
-| `cmd/expbilingual` | Run the RAG-024 bilingual evaluation arms over a frozen split | — (run directly) |
-| `cargo run --manifest-path rust/Cargo.toml --bin expbilingual` | Rust equivalent of `cmd/expbilingual` (same arms, environment, output, and cache format; reads are scoped to `RAG_CORPUS`, default `trusted`) | — (run directly) |
+| `cargo run --locked --bin ingest <file>` | Chunk a file and store its embeddings (safe to re-run) | `make ingest FILE=…` |
+| `cargo run --locked --bin query "question"` | Answer a question from the stored chunks with citations | `make ask Q="…"` |
+| `cargo run --locked --bin eval` | Score retrieval against `evals/retrieval.json` | `make eval` |
+| `cargo run --locked --bin expbilingual` | Run the RAG-024 bilingual evaluation arms over a frozen split | — (run directly) |
+| `cargo run --locked --bin api` | Serve the Axum API for the Next.js UI on `127.0.0.1:8080` | — (run directly) |
 
-Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`,
-`fmt-json`, `integration`, and `sweep` (compares `cmd/eval` metrics across a
-settings matrix). See the [command reference](docs/reference/commands.md) for
-flags and environment settings.
+Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`, `fmt-json`,
+and the Rust/web checks. See the [command reference](docs/reference/commands.md)
+for flags and environment settings.
 
-## Web UI (RUST-008A)
+## Web UI
 
 The real browser UI lives under `web/`. The browser calls only same-origin Next.js
 `/api/*` endpoints; the Next.js server proxies them to the Rust Axum API, and the
 API calls the same ingestion, retrieval, generation, and citation-validation
-services as the CLI. The UI is no longer mock-only.
+services as the CLI.
 
 ```bash
-cargo build --locked --manifest-path rust/Cargo.toml --bin api
-rust/target/debug/api          # 127.0.0.1:8080
+cargo build --locked --bin api
+target/debug/api               # 127.0.0.1:8080
 make web-start                 # 127.0.0.1:3000
 make web-e2e                   # real-browser Playwright verification
 ```
@@ -106,29 +108,32 @@ make web-e2e                   # real-browser Playwright verification
 See [web/README.md](web/README.md) and the
 [RUST-008A browser evidence](docs/reference/rust-008a-browser-evidence.md).
 
-## Go and Rust coexist during the transition
+## Rust-only layout
 
-The Go reference implementation stays present and unchanged. The Rust port lives
-under `rust/`; build and test it with `rust/Cargo.toml`:
+RUST-007C moved the Cargo package to the repository root and removed the Go
+implementation, `go.mod`/`go.sum`, and Go-only tooling. The Rust package now
+provides every command and the Axum API:
 
 ```bash
-make rust-check      # fmt, build, test, clippy, transition evidence
-transition-evidence  # evidence harness + clean checkout with Go present
+make rust-check      # fmt, build, test, clippy, final layout, clean checkout
+make transition-evidence
 ```
 
 The frozen transition record — capability matrix, remaining limitations,
 rollback reference, pinned Go commit SHA, source repository URL, and fixture
 provenance — is
-[RUST-007B transition evidence](docs/reference/rust-transition-evidence.md).
-Frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`)
-are shared and read-only.
+[Rust transition evidence](docs/reference/rust-transition-evidence.md). The
+pinned Go reference (`d72fb398e8959eea83ed24be03f6df8cdeca86a2`) and the frozen
+`fixtures/parity/` outputs are preserved for audit; expected values are never
+regenerated from Rust.
 
-`cmd/expbilingual` is evaluation-only: it does **not** modify production
-retrieval. It selects an arm with `ARM` (`A`, `B`, `C`, `D1`, `D2`, `E`, or
-`all`), reads its cases from `EVAL_DATASET`, pins generation (temperature 0,
-fixed seed, bounded output) and caches results by case id and configuration.
-The Rust `expbilingual` binary is evaluation-only in the same way; its contract
-and Go-to-Rust invocation mapping are in
+Frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`,
+`fixtures/`) are read-only inputs.
+
+`expbilingual` is evaluation-only: it does **not** modify production retrieval.
+It selects an arm with `ARM` (`A`, `B`, `C`, `D1`, `D2`, `E`, or `all`), reads its
+cases from `EVAL_DATASET`, pins generation (temperature 0, fixed seed, bounded
+output), and caches results by case id and configuration. Its contract is in
 [RUST-007D-bilingual-contract.md](docs/reports/rust-migration/RUST-007D-bilingual-contract.md).
 
 ## Documentation
@@ -153,7 +158,9 @@ the gap-closure capabilities (RAG-006…RAG-015) are shipped and covered by test
 see the [capabilities reference](docs/reference/capabilities.md). PDF text-layer
 ingestion (RAG-007) and page provenance / page-aware citations (RAG-017) are also
 implemented; the [architecture overview](docs/architecture/OVERVIEW.md) records
-what ships today. OCR for scanned PDFs (RAG-008) and genealogy entity extraction
+what ships today. The final repository is Rust-only: RUST-007C removed the Go
+implementation after the Rust port passed its parity, live-RAG, and browser
+acceptance gates. OCR for scanned PDFs (RAG-008) and genealogy entity extraction
 (RAG-016) are **not** implemented.
 
 ## Learning path
@@ -166,8 +173,8 @@ what ships today. OCR for scanned PDFs (RAG-008) and genealogy entity extraction
 6. Retrieve top-k chunks
 7. Send retrieved context to a local Qwen model
 8. Add metadata and citations
-9. Add hybrid search and reranking (`cmd/eval` compares a lexical and an LLM reranker)
-10. Add evaluation (`cmd/eval` reports recall and precision)
+9. Add hybrid search and reranking (`eval` compares a lexical and an LLM reranker)
+10. Add evaluation (`eval` reports recall and precision)
 11. Add query transformation and multi-query retrieval (`QUERY_REWRITE`)
 12. Gate answers on answerability, and judge facts, groundedness, and citations
-13. Measure changes instead of guessing (`scripts/sweep.sh`)
+13. Measure changes with `cargo run --locked --bin eval` instead of guessing

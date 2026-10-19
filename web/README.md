@@ -27,8 +27,8 @@ server-side setting; both Next.js and Axum bind `127.0.0.1` by default.
 Start the database and Ollama as for the CLI, then:
 
 ```sh
-cargo build --locked --manifest-path rust/Cargo.toml --bin api
-rust/target/debug/api            # 127.0.0.1:8080, RAG_CORPUS default "trusted"
+cargo build --locked --bin api
+target/debug/api            # 127.0.0.1:8080, RAG_CORPUS default "trusted"
 make web-start                   # 127.0.0.1:3000
 ```
 

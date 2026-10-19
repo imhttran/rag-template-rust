@@ -33,7 +33,7 @@ test.describe.serial("RUST-008A browser integration", () => {
     await page
       .getByTestId("file-input")
       .setInputFiles(
-        path.join(repo, "rust/fixtures/parity/inputs/text-layer.pdf"),
+        path.join(repo, "fixtures/parity/inputs/text-layer.pdf"),
       );
     await page.getByTestId("ingest-button").click();
     await expect(page.getByTestId("ingest-status")).toContainText(
@@ -130,7 +130,7 @@ test.describe.serial("RUST-008A browser integration", () => {
     await page
       .getByTestId("file-input")
       .setInputFiles(
-        path.join(repo, "rust/fixtures/parity/inputs/mixed-text-scan.pdf"),
+        path.join(repo, "fixtures/parity/inputs/mixed-text-scan.pdf"),
       );
     await page.getByTestId("ingest-button").click();
     await expect(page.getByTestId("incomplete-pdf")).toContainText("2");

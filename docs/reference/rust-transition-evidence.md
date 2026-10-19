@@ -1,69 +1,66 @@
-# RUST-007B transition evidence (Go present)
+# Rust transition evidence (Rust-only)
 
-Frozen evidence for the Go→Rust transition while the Go reference implementation
-remains present in this repository. This document is the authoritative transition
-record. Go is not removed by RUST-007B.
+Final evidence for the Go → Rust migration. RUST-007C moved the Cargo package to
+the repository root and removed the Go implementation, `go.mod`/`go.sum`, and
+Go-only tooling. The pinned Go reference and its frozen fixtures remain recorded
+for audit.
 
-The evidence crate `rust/acceptance/evidence` reads this file from
+The evidence crate `acceptance/evidence` reads this file from
 `docs/reference/rust-transition-evidence.md` and asserts every section below.
 
 ## Capability matrix
 
-| Capability | Go reference | Rust port | Status |
-| --- | --- | --- | --- |
-| Build | `go build ./...` | `cargo build --locked --manifest-path rust/Cargo.toml` | Both present |
-| Unit tests | `go test ./...` | `cargo test --locked --manifest-path rust/Cargo.toml` | Both present |
-| Vet / lint | `go vet ./...` | `cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings` | Both present |
-| Format check | `gofmt -l .` | `cargo fmt --manifest-path rust/Cargo.toml --check` | Both present |
-| Ingest | `go run ./cmd/ingest` | Rust ingest CLI (`rust/acceptance/ingest_cli`) | Go authoritative, Rust ported |
-| Ask | `go run ./cmd/rag` | Rust retrieval CLI (`rust/acceptance/retrieval_cli`) | Go authoritative, Rust ported |
-| Eval | `go run ./cmd/eval` | Rust eval parity (`rust/acceptance/eval_parity`) | Go authoritative, Rust ported |
-| Sweep | `./scripts/sweep.sh` | Rust eval parity harness | Go authoritative, Rust partial |
-| Bilingual export | `cmd/expbilingual` | Rust bilingual contract (`rust/acceptance/bilingual_parity`) | Go authoritative, Rust ported |
-| Migration evidence | this document | `rust/acceptance/evidence` | Frozen |
-| Browser UI | no baseline | Next.js + Axum (`rust/src/bin/api.rs`, `web/`) | RUST-008A verified |
-| Clean checkout | accepted Go checks | `rust/acceptance/clean_checkout_go` | Frozen |
+| Capability | Final implementation | Status |
+| --- | --- | --- |
+| Build | `cargo build --locked` | Rust only |
+| Unit/integration tests | `cargo test --locked` | Rust only |
+| Lint | `cargo clippy --locked --all-targets -- -D warnings` | Rust only |
+| Format check | `cargo fmt --check` | Rust only |
+| Ingest | `cargo run --locked --bin ingest` (PDF, Markdown, plain text) | Rust only |
+| Ask | `cargo run --locked --bin query` | Rust only |
+| Eval | `cargo run --locked --bin eval` | Rust only |
+| Bilingual export | `cargo run --locked --bin expbilingual` | Rust only |
+| HTTP API | `cargo run --locked --bin api` (Axum) | Rust only |
+| Browser UI | Next.js in `web/` over the Axum API | Rust + Next.js |
+| Migration evidence | `acceptance/evidence`, `acceptance/final_layout` | Frozen |
+| Clean checkout | `acceptance/clean_checkout` (Go absent from `PATH`) | Rust only |
+| Go settings-matrix sweep | removed with the Go scripts; `eval` remains | Not ported |
 
-The Makefile keeps the Go targets (`test`, `integration`, `ingest`, `ask`,
-`eval`, `sweep`) and the Rust targets (`rust-fmt`, `rust-build`, `rust-test`,
-`rust-clippy`, `rust-check`). `make check` runs `test rust-check web-check`.
+The Makefile, `.githooks/`, and CI run the Rust-only commands. `make check` runs
+`cargo test --locked`, the Rust checks, the final-layout/clean-checkout
+acceptance, and the web typecheck/build.
 
 ## Remaining limitations
 
-- The Go reference implementation stays authoritative for ingest, ask, eval,
-  sweep, and bilingual export until a later task removes it.
-- The full `internal/cli` suite stall is still open; see
-  `docs/reports/rust-migration/cli-fullsuite-timeout-evidence.md`.
-- RUST-007D live-model groundedness/citation closure is **verified** and accepted
-  by the operator (`sop verify RUST-007D` → `VERIFIED`); the preserved audit is
-  under `.agent-sdlc/runs/RUST-007D/`.
-- RUST-007E closed the original K=3 parity, production Markdown/plain-text
-  ingestion, and the live Ollama/PostgreSQL ingest → query → cited-answer path;
-  see `RUST-007E-live-evidence.md` and the `k3_parity`/`ingest_md_text` crates.
-- The Rust package still lives at `rust/` and is not moved to the repository
-  root.
-- The Rust port has no complete replacement for the `scripts/sweep.sh` settings
-  matrix.
-- RUST-008A delivers the real Axum/Next.js browser flow over the shared Rust
-  services; see `RUST-008A-browser-evidence.md` and
-  `rust/acceptance/api_contract`. The Rust-only layout (RUST-007C) and the final
-  Rust-only browser acceptance (RUST-008) remain open.
-- A clean checkout needs both the Go and the Rust toolchains plus `make`.
+- The Go implementation was removed in RUST-007C. The pinned reference
+  `d72fb398e8959eea83ed24be03f6df8cdeca86a2` and its frozen `fixtures/parity/`
+  outputs are preserved; expected values are never regenerated from Rust.
+- The Rust port has no replacement for the removed Go `scripts/sweep.sh` settings
+  matrix. Use `cargo run --locked --bin eval` for evaluation.
+- OCR for scanned PDFs is not offered; incomplete or fully scanned PDFs are
+  rejected before embedding or database writes.
+- RUST-008A delivered the real Axum/Next.js browser flow over the shared Rust
+  services; browser checks are operator-run Playwright evidence, while the
+  Rust-side contract is verified by `acceptance/api_contract`.
+- The final Rust-only acceptance is RUST-008, which follows the verified RUST-007C
+  layout/clean-checkout transition.
 
 ## Rollback reference
 
-To restore the Go reference implementation as the only implementation:
+RUST-007C removed the Go source and tooling. If the Go reference must be restored
+for audit:
 
-1. Revert the Rust acceptance harness crates and this evidence document.
-2. Restore `Makefile` so `check` runs `test` only.
-3. Restore `.githooks/pre-commit` and `.githooks/pre-push` to the Go-only steps.
-4. Remove `.github/workflows/ci.yml` (the transition CI definition).
-5. Rebuild the Go reference: `go build ./...`, `go test ./...`, `go vet ./...`.
-6. The Go sources under `cmd/` and `internal/` were never removed, so no source
-   recovery is needed. Restoring Go is a revert of tooling only.
+1. Recover the Go tree from the pinned commit
+   `d72fb398e8959eea83ed24be03f6df8cdeca86a2` (the RUST-001 reference freeze).
+2. Restore `go.mod`/`go.sum`, `cmd/`, `internal/`, `tools/`, and the Go-era
+   `Makefile`, hooks, and CI jobs from that commit.
+3. Rebuild and test the Go reference with `go build ./...`, `go test ./...`, and
+   `go vet ./...`.
+4. The frozen Rust fixtures, `migrations/`, `evals/`, `examples/`, and
+   `docker-compose.yml` are unchanged and need no recovery.
 
-The Go reference tree is frozen at commit SHA
-`d72fb398e8959eea83ed24be03f6df8cdeca86a2`.
+The Rust-only repository remains the forward implementation; the Go reference is
+historical.
 
 ## Pinned Go commit SHA
 
@@ -71,11 +68,13 @@ The Go reference tree is frozen at commit SHA
 
 ## Source repository URL
 
-`https://github.com/tomtran/rag-template`
+Current repository: `https://github.com/imhttran/rag-template-rust`
+
+Historical Go reference source URL: `https://github.com/tomtran/rag-template`
 
 ## Fixture provenance
 
-Frozen fixtures and shared assets. RUST-007B does not modify any of them.
+Frozen fixtures and shared assets. RUST-007C does not modify them.
 
 | Asset | Purpose |
 | --- | --- |
@@ -83,23 +82,24 @@ Frozen fixtures and shared assets. RUST-007B does not modify any of them.
 | `evals/` | Frozen retrieval evaluation set (`evals/retrieval.json`). Read-only input. |
 | `examples/` | Frozen sample documents (for example `examples/loan-policy.md`). Read-only input. |
 | `docker-compose.yml` | PostgreSQL + pgvector service definition. Unchanged. |
-| `rust/fixtures/` | Frozen Rust fixture set (`en/`, `vi/`, `page/`). Unchanged. |
+| `fixtures/` | Frozen Rust fixture set (`en/`, `vi/`, `page/`, `parity/`) and the captured Go reference outputs under `fixtures/parity/frozen/`. Unchanged. |
 
 Each asset keeps the provenance recorded in `RUST-001-go-baseline.md` (fixture
-manifest) and `RUST-003-fixture-parity.md` (section/chunk acceptance matrix).
+manifest) and `RUST-003-fixture-parity.md` (section/chunk acceptance matrix). The
+frozen K=3/K=4 and bilingual outputs in `fixtures/parity/frozen/` record the pinned
+Go commit and the deterministic capture setup.
 
 ## CI configuration
 
-`.github/workflows/ci.yml` defines the transition layout while Go remains
-present:
+`.github/workflows/ci.yml` defines the Rust-only layout:
 
-- `go-reference` runs `go build ./...`, `go test ./...`, `go vet ./...`, and a
-  `gofmt` check with Go installed from `go.mod`.
-- `rust-transition` installs the pinned toolchain from
-  `rust/rust-toolchain.toml`, runs Rust fmt/build/test/Clippy, then
-  `make rust-acceptance-evidence` and
-  `make rust-acceptance-clean-checkout`. The clean-checkout crate runs the Go
-  commands too, so this job installs Go as well.
+- `rust` installs the pinned toolchain from `/rust-toolchain.toml`, applies the
+  migrations to a pgvector service, then runs `cargo fmt --check`,
+  `cargo build --locked`, `cargo test --locked`, Clippy, and
+  `make transition-evidence`.
+- `api-contract` applies the migrations and runs
+  `make rust-acceptance-api-contract`.
+- `web` runs `npm ci`, `npm run typecheck`, and `npm run build` for the Next.js UI.
 
 The local equivalents are the `.githooks/` hooks, which delegate to the same
 Makefile targets.

@@ -5,7 +5,7 @@ differences in [`docs/reference/rust-008a-browser-evidence.md`](../../reference/
 The UI is no longer mock-only.
 
 Records the schemas the UI-002 prototype was built against. Every response is now
-served by the real Axum API (`rust/src/bin/api.rs`); the browser still calls only
+served by the real Axum API (`src/bin/api.rs`); the browser still calls only
 same-origin Next.js `/api/*` endpoints, which the Next.js server proxies.
 
 ## Screens and state transitions

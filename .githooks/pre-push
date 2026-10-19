@@ -1,71 +1,22 @@
 #!/bin/sh
-# Pre-push checks for this repo: the integration tests that
-# .githooks/pre-commit skips.
-#
-# The PostgreSQL + pgvector integration tests need a running database (and
-# therefore Docker).
+# Pre-push checks for this Rust-only repository.
 #
 # Enabled with:  git config core.hooksPath .githooks
 # Bypass once:   git push --no-verify
 #
-# The runner is a project-agnostic script under .agents/scripts/, so it can be
-# shared with other repositories. This hook supplies only what is specific to
-# this project:
-#
-#   .agents/scripts/integration-test-agent.sh
-#     INTEGRATION_TEST_CMD     the go test invocation below
-#     INTEGRATION_TEST_DB      RAG_TEST_DATABASE_URL, a throwaway database
-#     INTEGRATION_TEST_AGENT   set it to point at a shared copy
-#     RAG_REQUIRE_INTEGRATION  fail, instead of skipping, when the database is down
-#
-# The integration tests truncate the documents table, so this hook never touches
-# DATABASE_URL (your dev database). It points them at RAG_TEST_DATABASE_URL
-# instead, a throwaway database that has to exist:
-#
-#   RAG_TEST_DATABASE_URL
-#     default: postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable
-#
-# Create it once:
-#   psql 'postgres://rag:rag@127.0.0.1:5434/rag?sslmode=disable' -c 'CREATE DATABASE rag_test'
-#
-# A missing database is skipped with a note, so a stopped Docker daemon never
-# blocks a push.
-
+# The Makefile targets are the single source of truth. The full Rust suite runs
+# here (it needs the configured database for the integration tests), followed by
+# the final-layout and clean-checkout acceptance and the web production build.
 set -e
 
 # Load the repository .env (if present) so database checks get DATABASE_URL
 # without repeated manual exports. Values are never printed.
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 
-test_url="${RAG_TEST_DATABASE_URL:-postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable}"
-
-integration_test_agent="${INTEGRATION_TEST_AGENT:-.agents/scripts/integration-test-agent.sh}"
-
-if [ ! -x "$integration_test_agent" ]; then
-	# This is a gate, so a missing runner must not skip.
-	echo "pre-push: $integration_test_agent is not executable (set INTEGRATION_TEST_AGENT)" >&2
-
-	exit 1
-fi
-
-echo "pre-push: integration tests"
-
-# -p 1 runs the packages one at a time: internal/retrieval truncates the whole
-# table, which would fight internal/ingestion's tests if they ran in parallel.
-# -count=1 skips Go's test cache, so the queries really run. -v so the agent can
-# count the tests that actually ran.
-INTEGRATION_TEST_CMD='RAG_INTEGRATION=1 go test ./internal/retrieval/ ./internal/ingestion/ -run Integration -p 1 -count=1 -v' \
-INTEGRATION_TEST_DB="$test_url" \
-INTEGRATION_TEST_STRICT="$RAG_REQUIRE_INTEGRATION" \
-INTEGRATION_TEST_HINT='pre-push: start the database (docker compose up -d --wait) and create rag_test once, see the README' \
-	"$integration_test_agent"
-
-# Rust and web checks. Go stays in the repository until RUST-007; the integration
-# check above remains. The Makefile targets are the single source of truth.
-echo "pre-push: rust build/test/clippy (make rust-build rust-test rust-clippy)"
+echo "pre-push: Rust build/test/clippy (make rust-build rust-test rust-clippy)"
 make rust-build rust-test rust-clippy
 
-echo "pre-push: transition evidence + clean checkout with Go present (make transition-evidence)"
+echo "pre-push: final layout and clean checkout without Go (make transition-evidence)"
 make transition-evidence
 
 echo "pre-push: make web-check-env"

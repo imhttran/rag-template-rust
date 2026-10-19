@@ -25,7 +25,7 @@ transactional replacement path as PDFs.
 
 ## Acceptance evidence
 
-`cargo test --locked --manifest-path rust/acceptance/ingest_md_text/Cargo.toml` →
+`cargo test --locked --manifest-path acceptance/ingest_md_text/Cargo.toml` →
 **PASS** (1 test). It drives the real `ingest` binary against a dedicated
 PostgreSQL/pgvector database and a deterministic embedding server, and proves:
 
@@ -39,6 +39,6 @@ PostgreSQL/pgvector database and a deterministic embedding server, and proves:
 - a changed source that fails on an embedding-dimension mismatch leaves the
   previously stored content and fingerprint intact.
 
-The unit tests in `rust/src/pipeline.rs` additionally cover Markdown/plain-text
+The unit tests in `src/pipeline.rs` additionally cover Markdown/plain-text
 dispatch, page-less provenance, empty rejection, and unknown formats with
 recording ports (zero embedding calls and zero writes).

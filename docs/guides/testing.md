@@ -6,10 +6,10 @@ used by the database integration tests, and the optional real-Ollama smoke test.
 ## The standard suite (no database, no network, no model)
 
 ```sh
-make test        # or: go test ./...
+make test        # or: cargo test --locked
 ```
 
-`go test ./...` runs every non-optional test with no database and no model.
+`cargo test --locked` runs every non-optional test with no database and no model.
 Database-backed tests **skip** (they do not fail) unless `RAG_INTEGRATION=1` is
 set, so the standard suite stays fast and green on a machine with no PostgreSQL
 and no Ollama running. Deterministic, network-free stub providers back the
@@ -42,32 +42,31 @@ database. The harness conventions are:
 make db-up            # start PostgreSQL 16 + pgvector (docker-compose)
 ```
 
-### Running the integration tests
+### Running the database-backed tests
 
-The ingestion/retrieval package integration tests:
-
-```sh
-RAG_INTEGRATION=1 \
-RAG_TEST_DATABASE_URL=postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable \
-  go test ./internal/ingestion ./internal/retrieval -run Integration -v -p 1
-```
-
-`-p 1` serializes the two packages: `internal/retrieval` truncates the whole
-`documents` table, so it must not run in parallel with `internal/ingestion`.
-
-The RAG-025B end-to-end + atomicity tests in `internal/rag` (ingest → pgvector
-retrieve → generate, plus atomic-replacement rollback), against the same
-disposable database:
+The schema, ingestion, and retrieval tests use the dedicated database in
+`DATABASE_URL` and fail (never skip) when it is unavailable or lacks pgvector.
 
 ```sh
-RAG_INTEGRATION=1 \
-RAG_TEST_DATABASE_URL=postgres://rag:rag@127.0.0.1:5434/rag_test?sslmode=disable \
-  go test ./internal/rag -run Integration -v
+cargo test --locked --test ingest_binary --test section_chunks_pg --test storage_interop -- --test-threads=1
 ```
 
-The rag-package harness reads `RAG_TEST_DATABASE_URL`, applies every
-`migrations/*.sql` idempotently, and **skips** (never fails) when
-`RAG_INTEGRATION` is unset or the database is unreachable.
+`--test-threads=1` serializes the database tests: some replace whole source
+rows, so they must not run in parallel.
+
+The full suite (including the binary and library tests) is:
+
+```sh
+cargo test --locked
+```
+
+The live production ingest → query → cited-answer check is the explicit
+`acceptance/live_rag` crate; it requires real Ollama and a dedicated database and
+is not part of the default suite:
+
+```sh
+cargo test --locked --manifest-path acceptance/live_rag/Cargo.toml
+```
 
 ### Schema migration
 
@@ -110,10 +109,10 @@ suite's pass/fail:
 
 ```sh
 # Example: point the commands at a running Ollama and exercise the path.
-OLLAMA_URL=http://127.0.0.1:11434 go run ./cmd/rag
+OLLAMA_URL=http://127.0.0.1:11434 cargo run --locked --bin query
 ```
 
-Because it needs a live model, it is excluded from `go test ./...`; the stub
+Because it needs a live model, it is excluded from `cargo test --locked`; the stub
 provider/generator covers the deterministic, network-free path in the suite.
 
 ## Provider selection
