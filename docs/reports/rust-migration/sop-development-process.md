@@ -1817,3 +1817,77 @@ Date: 2026-10-18. One bounded RUST-007D recovery was run with the Claude command
 - Go removal remains deferred.
 
 No merge or auto-merge was performed. RAG CI remains absent; SOP repository CI is separate.
+
+## 34. RUST-007D verified recovery, acceptance audit, and recovery binding
+
+Date: 2026-10-19. This section records the completed RUST-007D verdict. Nothing
+in `.agent-sdlc/` was edited, and no budget, attempt counter, criterion, or gate
+was reset.
+
+### 34.1 No active SOP process
+
+- No `sop run`, SOP agent, or implementation subprocess was active when this
+  record was written (`ps` showed only the long-running Next.js prototype and
+  unrelated system processes; `sop approvals --json` returned an empty list).
+- The plan is idle at `ACTIVE`; the only open work is `RUST-007B` (see §34.5).
+
+### 34.2 Verified outcome
+
+- `sop verify RUST-007D` → `status: VERIFIED`, `validation: passed`,
+  `lifecycle: LOCAL_DONE`.
+- `state.json` → `stage: PASSED`; `gate.json` → `Decision: PASS`.
+- All five required criteria are `Met`: criteria 1–3 and 5 through their mapped
+  deterministic checks; criterion 4 (live-model groundedness/citations) through
+  the operator acceptance bound to it.
+- The eight configured validation commands (Go build/test/vet/gofmt and Rust
+  build/test/fmt/clippy) all exited `0`.
+- Execution was verify-first: `report.json` records `execution_mode:
+  verify-first`, `verified_first: true`; the zero-mutation verification reused
+  the delivered implementation (`agent_calls: 0`, `agent_calls_avoided: 1`,
+  `validation_runs: 1`, `review_runs: 0`, `fix_cycles: 0`). No model call was
+  needed to close the task.
+
+### 34.3 Preserved acceptance audit
+
+- `.agent-sdlc/runs/RUST-007D/acceptance_decisions.jsonl` preserves the operator
+  decision: `criterion-4`, `decision: accept`, `approver: operator`,
+  `recorded_at: 2026-10-18T23:45:16Z`, bound to `attempt: 1`. The evidence names
+  `docs/reports/rust-migration/RUST-007D-live-model-evidence.md` and the two
+  repaired live repeats plus the Go baseline artifacts under
+  `docs/reports/rust-migration/live-007d/`.
+- `.agent-sdlc/runs/RUST-007D/acceptance_recoveries.jsonl` preserves the
+  recovery binding: `from_attempt: 1` → `to_attempt: 3`, `source: approve`,
+  `by: operator`, `recorded_at: 2026-10-19T03:34:18Z`. This is the binding that
+  moved the accepted criterion-4 evidence onto the reviewed attempt without
+  re-running the live model.
+- `.agent-sdlc/runs/RUST-007D/recovery.jsonl` records the earlier attempt-2
+  `authorization_failure` → `human` stop. It is preserved, not overwritten.
+- `approval-history.json` preserves both `NEEDS_HUMAN` requests and their
+  approvals (2026-10-18T23:45:18Z and 2026-10-19T03:34:18Z).
+- `.agent-sdlc/` remains git-ignored (`*`) and untracked; the audit is preserved
+  on disk and was not modified by this record.
+
+### 34.4 Installed SOP revision
+
+- Installed binary: `/home/tomtran/go/bin/sop`; `sop version` → `sop dev`.
+- `go version -m` build information: module
+  `github.com/imhttran/agentic-sop`, pseudo-version
+  `v0.0.0-20261019032842-205701add58c`, `vcs.revision`
+  `205701add58cfebee9b83d3e7afb86720f31cfff`, `vcs.time`
+  `2026-10-19T03:28:42Z`, `vcs.modified: false`, `go1.27.1`.
+- SHA-256: `0d1284ae195b8cbea01cd64f94623e130bc1bbcfd2ebc1db54c8af8f2f469ea3`.
+- This supersedes the `fff8d742` / `7a1d1759` snapshot named in §33.1; that
+  value described the binary used for the earlier recovery, not the binary that
+  produced the VERIFIED verdict recorded here.
+
+### 34.5 State and remaining requirements
+
+- `sop status`: RUST-007D is `LOCAL_DONE`; `RUST-007B` and `RUST-007C` remain
+  `PLANNED`; `RUST-008` remains `PLANNED`.
+- Still explicitly open (not implied closed by RUST-007D): original K=3 parity
+  (current eval proof uses `FINAL_K=4`), Markdown/plain-text ingestion, live
+  production ingest → query → cited answer, and the real Axum/Next.js browser
+  flow. The Rust-only clean checkout and Go removal remain deferred to
+  `RUST-007B`/`RUST-007C`.
+- Next unmet requirement: `RUST-007B` (freeze transition evidence and update
+  pre-removal tooling while Go remains present).

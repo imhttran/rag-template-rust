@@ -761,6 +761,10 @@ Port the Go `cmd/expbilingual` experiment harness. This is the single follow-up 
 - criterion 4: manual: live-model groundedness and citation evidence (UNMET until a real Ollama run is recorded)
 - criterion 5: check 5
 
+### Execution
+
+- verify-first
+
 ### Work Steps
 
 1. Add the production `expbilingual` binary and bilingual module; preserve arms A/B/C/D1/D2/E, dataset formats, the cache path/semantics, and the pinned generation settings.
