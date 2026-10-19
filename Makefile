@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
+.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-clean-checkout transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
 # Convenience targets for the ingest/query workflow.
 #
 #   make db-up        start PostgreSQL and apply the schema
@@ -116,7 +116,18 @@ rust-test:
 rust-clippy:
 	cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
 
-rust-check: rust-fmt rust-build rust-test rust-clippy
+# RUST-007B acceptance: the frozen transition record and the documented
+# clean-checkout sequence. Both crates read the repository relative to their own
+# manifest, so they run alongside the Go reference while it remains present.
+rust-acceptance-evidence:
+	cargo test --locked --manifest-path rust/acceptance/evidence/Cargo.toml
+
+rust-acceptance-clean-checkout:
+	cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml
+
+transition-evidence: rust-acceptance-evidence rust-acceptance-clean-checkout
+
+rust-check: rust-fmt rust-build rust-test rust-clippy transition-evidence
 
 # ---- Web checks (the Next.js prototype under web/) -----------------------------
 web-typecheck:

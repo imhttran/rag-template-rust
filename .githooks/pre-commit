@@ -81,6 +81,9 @@ go build ./...
 echo "pre-commit: make rust-fmt"
 make rust-fmt
 
+echo "pre-commit: make rust-acceptance-evidence"
+make rust-acceptance-evidence
+
 echo "pre-commit: make web-check-env"
 make web-check-env
 

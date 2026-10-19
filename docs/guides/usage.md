@@ -41,6 +41,33 @@ This procedure is never applied by `make db-schema`, `make db-up`, or the
 `docker-entrypoint-initdb.d` mount in `docker-compose.yml`, because it is not
 under `migrations/*.sql`.
 
+## Clean checkout with Go present
+
+The Go reference implementation and the Rust port (`rust/Cargo.toml`) coexist in
+this repository. Go stays present: do not remove `cmd/`, `internal/`, or `go.mod`.
+A clean checkout needs both toolchains installed (Go 1.26 or newer, and the Rust
+toolchain pinned by `rust/rust-toolchain.toml`) plus `make`. Copy the checkout
+without `.git`, `target/`, or `node_modules/`, then run the documented steps:
+
+```bash
+go build ./...
+go test ./...
+go vet ./...
+make rust-test
+```
+
+The transition record, including the capability matrix and the rollback
+reference, is
+[`docs/reference/rust-transition-evidence.md`](../reference/rust-transition-evidence.md).
+The frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`)
+are shared by both toolchains and are not modified.
+
+`DATABASE_URL` must point at a reachable pgvector database for the Rust suite.
+A local `.env` is developer state and is not part of a clean checkout; export the
+variable in the shell, or keep `.env` beside the checkout you copied from. The
+RUST-007B clean-checkout harness reads the source checkout's `.env` and passes its
+values to the documented steps without copying the file.
+
 ## Ingest
 
 Chunk a document, embed each chunk, and store it:

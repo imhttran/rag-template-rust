@@ -88,6 +88,23 @@ Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`,
 settings matrix). See the [command reference](docs/reference/commands.md) for
 flags and environment settings.
 
+## Go and Rust coexist during the transition
+
+The Go reference implementation stays present and unchanged. The Rust port lives
+under `rust/`; build and test it with `rust/Cargo.toml`:
+
+```bash
+make rust-check      # fmt, build, test, clippy, transition evidence
+transition-evidence  # evidence harness + clean checkout with Go present
+```
+
+The frozen transition record — capability matrix, remaining limitations,
+rollback reference, pinned Go commit SHA, source repository URL, and fixture
+provenance — is
+[RUST-007B transition evidence](docs/reference/rust-transition-evidence.md).
+Frozen assets (`migrations/*.sql`, `evals/`, `examples/`, `docker-compose.yml`)
+are shared and read-only.
+
 `cmd/expbilingual` is evaluation-only: it does **not** modify production
 retrieval. It selects an arm with `ARM` (`A`, `B`, `C`, `D1`, `D2`, `E`, or
 `all`), reads its cases from `EVAL_DATASET`, pins generation (temperature 0,

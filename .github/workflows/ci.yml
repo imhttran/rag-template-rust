@@ -1,0 +1,58 @@
+name: CI
+
+# Transition-layout CI: the Go reference and the Rust port are both present
+# during RUST-007B, and the Rust clean-checkout acceptance crate invokes the Go
+# toolchain, so both are installed in the Rust job as well.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go-reference:
+    name: Go reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build
+        run: go build ./...
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Format check
+        run: test -z "$(gofmt -l .)"
+
+  rust-transition:
+    name: Rust port and transition evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The clean-checkout acceptance crate runs the documented sequence, which
+      # includes `go build`, `go test`, and `go vet`.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # rustup honors rust/rust-toolchain.toml and installs the pinned channel.
+      - name: Install pinned Rust toolchain
+        run: rustup show
+        working-directory: rust
+      - name: Format check
+        run: cargo fmt --manifest-path rust/Cargo.toml --check
+      - name: Build
+        run: cargo build --locked --manifest-path rust/Cargo.toml
+      - name: Test
+        run: cargo test --locked --manifest-path rust/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
+      - name: Transition evidence
+        run: make rust-acceptance-evidence
+      - name: Clean checkout with Go present
+        run: make rust-acceptance-clean-checkout

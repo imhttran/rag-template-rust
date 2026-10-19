@@ -1891,3 +1891,85 @@ was reset.
   `RUST-007B`/`RUST-007C`.
 - Next unmet requirement: `RUST-007B` (freeze transition evidence and update
   pre-removal tooling while Go remains present).
+
+## 35. RUST-007B verified — transition evidence frozen with Go present
+
+Date: 2026-10-19. Two `--max-tasks 1` runs, no state edit, no budget reset, no Go
+removal.
+
+### 35.1 Run 1 — FAILED, root cause isolated
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` executed only
+  RUST-007B. Validation passed, then two review cycles failed on HIGH findings,
+  and the run ended `FAILED` with `CONTINUE` (`INCOMPLETE_IMPLEMENTATION`).
+- Root cause: the frozen evidence record was written under `docs/reports/`, and
+  SOP deliberately excludes `docs/reports/` (and `.agent-sdlc/`) from the
+  reviewed implementation diff. The review therefore could not see the document
+  and reported it missing even though it existed.
+- Secondary defects in the same attempt: `rust/acceptance/clean_checkout_go` had
+  no `Cargo.toml`/`Cargo.lock`; the documented section was `###` while the
+  harness matched `##`; and the harness did not forward `DATABASE_URL`, so the
+  documented `make rust-test` step failed inside the staged copy.
+- `changed-files.json` and `diff.patch` from this attempt are preserved under
+  `.agent-sdlc/runs/RUST-007B/`.
+
+### 35.2 Operator corrections between runs (no SOP state written)
+
+- Moved the evidence record to `docs/reference/rust-transition-evidence.md`, a
+  path SOP includes in the reviewed diff, and updated every reference.
+- Added `rust/acceptance/clean_checkout_go/Cargo.toml` and generated both
+  acceptance `Cargo.lock` files so the `--locked` checks can run.
+- Made `Clean checkout with Go present` a top-level section in
+  `docs/guides/usage.md`, and made the clean-checkout harness read the source
+  checkout's `.env` and forward its values to the documented steps (the file is
+  never copied into the staged tree). Added unit tests for that reader.
+- Completed the pre-removal tooling: `Makefile` targets
+  `rust-acceptance-evidence`, `rust-acceptance-clean-checkout`, and
+  `transition-evidence` wired into `rust-check`; `.githooks/pre-commit` runs the
+  evidence crate and `.githooks/pre-push` runs `make transition-evidence`; and
+  `.github/workflows/ci.yml` runs the Go reference and the Rust/transition jobs
+  with both toolchains installed. The command reference documents the targets.
+
+### 35.3 Run 2 — VERIFIED
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` → RUST-007B
+  `PASSED`; `sop verify RUST-007B` → `VERIFIED`, `validation: passed`,
+  `lifecycle: LOCAL_DONE`.
+- All four checks and all four criteria are `Met`:
+  `go build ./...`, `go test ./...`, `go vet ./...`,
+  `cargo test --locked --manifest-path rust/Cargo.toml`,
+  `cargo test --locked --manifest-path rust/acceptance/evidence/Cargo.toml` (5
+  tests), and
+  `cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml`
+  (3 tests, including the staged-copy run of `go build`, `go test`, `go vet`, and
+  `make rust-test`).
+- The eight configured validation commands all passed. The run used 0 fix
+  cycles, 2 agent calls, one validation run, and one review run; wall time was
+  7m 13s.
+- The installed SOP binary is the revision recorded in §34.4
+  (`205701a…`, SHA-256 `0d1284ae…`).
+
+### 35.4 Frozen evidence and preserved state
+
+- `docs/reference/rust-transition-evidence.md` records the capability matrix,
+  remaining limitations, rollback reference, pinned Go commit SHA
+  `d72fb398e8959eea83ed24be03f6df8cdeca86a2`, the source repository URL, and the
+  fixture provenance for `migrations/*.sql`, `evals/`, `examples/`,
+  `docker-compose.yml`, and `rust/fixtures/`.
+- `rust/acceptance/clean_checkout_go` stages a working-tree copy and runs the
+  documented setup with Go present.
+- Go sources, `go.mod`, `go.sum`, and all frozen assets remain untouched. No
+  `state.db` edit, budget reset, merge, or auto-merge occurred.
+
+### 35.5 Counts and remaining requirements
+
+- RUST-007B: 2 attempts, 2 invocations, 15 model calls, 0 approvals,
+  1 continuation (the run-1 `AUTO_CONTINUE` classification).
+- `sop status`: RUST-007B is `LOCAL_DONE`; RUST-007C and RUST-008 remain
+  `PLANNED`. RUST-007C was **not** started and Go was not removed.
+- Still explicitly open: original K=3 parity (the eval proof uses `FINAL_K=4`),
+  Markdown/plain-text ingestion, live production ingest → query → cited answer,
+  and the real Axum/Next.js browser end-to-end flow.
+- Next unmet requirement: `RUST-007C` (Rust-only transition and final
+  verification), which must not start until the open parity and live-flow
+  requirements are resolved.

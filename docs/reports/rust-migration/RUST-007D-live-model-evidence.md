@@ -1,7 +1,8 @@
 # RUST-007D — live-model closure requirement
 
-**Status: criterion-4 met by the recorded live evidence; operator acceptance
-decision pending. The SOP gate is untouched.**
+**Status: criterion-4 met and accepted by the operator; `sop verify RUST-007D`
+reports `VERIFIED`. The acceptance decision and the recovery binding are
+preserved in `.agent-sdlc/runs/RUST-007D/`.**
 
 Criterion (`criterion-4`): generated answers meet the baseline groundedness and
 citation criteria. This is a live-model closure requirement and cannot be

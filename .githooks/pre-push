@@ -65,6 +65,9 @@ INTEGRATION_TEST_HINT='pre-push: start the database (docker compose up -d --wait
 echo "pre-push: rust build/test/clippy (make rust-build rust-test rust-clippy)"
 make rust-build rust-test rust-clippy
 
+echo "pre-push: transition evidence + clean checkout with Go present (make transition-evidence)"
+make transition-evidence
+
 echo "pre-push: make web-check-env"
 make web-check-env
 
