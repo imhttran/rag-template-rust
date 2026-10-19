@@ -36,13 +36,14 @@ The Makefile keeps the Go targets (`test`, `integration`, `ingest`, `ask`,
 - RUST-007D live-model groundedness/citation closure is **verified** and accepted
   by the operator (`sop verify RUST-007D` → `VERIFIED`); the preserved audit is
   under `.agent-sdlc/runs/RUST-007D/`.
+- RUST-007E closed the original K=3 parity, production Markdown/plain-text
+  ingestion, and the live Ollama/PostgreSQL ingest → query → cited-answer path;
+  see `RUST-007E-live-evidence.md` and the `k3_parity`/`ingest_md_text` crates.
 - The Rust package still lives at `rust/` and is not moved to the repository
   root.
 - The Rust port has no complete replacement for the `scripts/sweep.sh` settings
   matrix.
-- Original K=3 parity, Markdown/plain-text ingestion, a live production
-  ingest → query → cited answer flow, and the real Axum/Next.js browser end-to-end
-  flow remain open.
+- The real Axum/Next.js browser end-to-end flow remains open and is RUST-008A.
 - A clean checkout needs both the Go and the Rust toolchains plus `make`.
 
 ## Rollback reference

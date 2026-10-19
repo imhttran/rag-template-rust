@@ -1973,3 +1973,102 @@ removal.
 - Next unmet requirement: `RUST-007C` (Rust-only transition and final
   verification), which must not start until the open parity and live-flow
   requirements are resolved.
+
+## 36. RUST-007E functional closure — verified
+
+Date: 2026-10-19. This section supersedes §35.5's open list: the original K=3
+parity, production Markdown/plain-text ingestion, and the live production RAG
+path are now verified. Go remains present.
+
+### 36.1 Preflight and plan update
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085` (`sop dev`), matching
+  the requested revision. No SOP process was active.
+- Isolated branch: `rust-007e-functional-closure`, based on the verified
+  RUST-007B commit `2e17ee1`. RUST-007B and RUST-007D remained
+  `LOCAL_DONE`/`VERIFIED`.
+- Added `RUST-007E` (dependencies RUST-007, RUST-007D, RUST-007B) and
+  `RUST-008A` (dependency RUST-007E); changed RUST-007C to depend on RUST-007B,
+  RUST-007E, and RUST-008A. RUST-008 still depends on RUST-007C.
+- Reconcile preview: 19 unchanged, `RUST-007C` updated (never executed),
+  `RUST-007E`/`RUST-008A` added, no executed-task changes. Applied with
+  `sop reconcile`.
+- RUST-007E was later switched to `Execution: verify-first` after its first
+  implementation attempt failed. SOP required the executed-definition change to
+  be accepted explicitly; `sop reconcile … --accept-changed RUST-007E` recorded
+  it. No criterion was weakened. The BLOCKED task was requeued with
+  `sop retry RUST-007E`.
+
+### 36.2 First run — no-progress block, no repeated attempt
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` with the configured
+  Ollama provider ran RUST-007E for 3 minutes: 17 iterations, 11 discovery
+  inspections, **0 repository mutations**, `IMPLEMENT_NO_PROGRESS`. The last
+  action was a rejected `write_file`.
+- SOP classified it `NO_PROGRESS` / `BLOCK` / `TERMINAL` and did not
+  auto-continue, because a retry under unchanged conditions would repeat.
+  `.agent-sdlc/runs/RUST-007E/` preserves that attempt.
+- The implementation was completed by the operator within the authorized scope;
+  SOP still owned the verdict. The run was not claimed as SOP-implemented.
+
+### 36.3 Implemented
+
+- Production ingest dispatch (`rust/src/pipeline.rs`, `rust/src/service.rs`,
+  `rust/src/bin/ingest.rs`): `.pdf` keeps the PDF loader and incomplete-page
+  gate; `.md`/`.markdown` use the shared section parser; `.txt` uses the
+  plain-text loader; unknown extensions are rejected before any effect. Both
+  page-less paths run `gate_sections` and converge on the existing fingerprint,
+  embedding, and transactional replacement path.
+- K=3 parity: added `rust/acceptance/k3_parity` and the Go `tools/rankdump`
+  reference helper. The ranking comparison exposed a real divergence — Rust
+  evaluation printed every chunk, while Go deduplicates sections after fusion.
+  Added `retrieval::dedup::dedup_sections` and used it in
+  `evaluation::evaluate_sql`, matching the Go pipeline.
+- Markdown/plain-text acceptance: `rust/acceptance/ingest_md_text` proves
+  provenance, ordering, unchanged duplicates, empty/missing/unknown rejection,
+  embedding failure isolation, and dimension-failure rollback.
+- Live RAG: `rust/acceptance/live_rag` drives the production `ingest`/`query`
+  binaries against real Ollama (`nomic-embed-text`, `llama3.2:3b`) and
+  PostgreSQL/pgvector, validates every citation against stored rows, and proves
+  the empty-corpus refusal. Evidence is recorded in
+  `docs/reports/rust-migration/RUST-007E-live-evidence.md`.
+- Added Makefile targets and command-reference entries for the three acceptance
+  crates; the live target is explicit and not part of the ordinary edit loop.
+
+### 36.4 Verify-first run — VERIFIED
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` (verify-first) →
+  RUST-007E `PASSED`; `sop verify RUST-007E` → `VERIFIED`,
+  `validation: passed`, `lifecycle: LOCAL_DONE`.
+- All five criteria are `Met`:
+  K=3 parity (`k3_parity`), Markdown/plain-text ingestion (`ingest_md_text`),
+  transactional safety and provenance (`ingest_md_text`), live Ollama/PostgreSQL
+  RAG (`live_rag`), and the existing Go/reference plus transition checks.
+- All nine acceptance checks passed, including `go build/test/vet`, the Rust
+  suite, `eval_evidence`, and the clean-checkout-with-Go crate. The eight
+  configured validation commands also passed.
+- Run metrics: 0 agent calls (verified first), 1 validation run, 0 fix cycles,
+  3m 52s.
+
+### 36.5 Results
+
+- **K=3 parity:** per-case ranking order, tie ordering, K=3 recall/precision,
+  rejection labels, and aggregate metrics match the pinned Go reference. K=4
+  output was not substituted.
+- **Markdown/plain text:** both formats ingest through the production binary;
+  rows keep source, language, chunk order, `page = NULL`, corpus, and hash;
+  duplicates are no-ops; rejected/failed cases leave prior rows intact.
+- **Live RAG:** Markdown, PDF (page 2), and plain-text citations validated
+  against stored rows; the empty corpus returned the baseline refusal with no
+  citations.
+- **Existing checks:** Go reference and RUST-007B transition/clean-checkout
+  checks remain green. Go is still present and operational.
+
+### 36.6 State and next milestone
+
+- `sop status`: RUST-007E `LOCAL_DONE`; RUST-008A `PLANNED`; RUST-007C
+  `PLANNED`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval reset, merge, or auto-merge.
+  RUST-008A and RUST-007C were not started.
+- Next executable milestone: `RUST-008A` (browser integration), then RUST-007C
+  (Rust-only transition).

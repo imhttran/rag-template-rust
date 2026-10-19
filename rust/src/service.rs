@@ -1,8 +1,9 @@
 //! Production ingestion service seam.
 //!
 //! This module is the callable entry point external crates use to ingest one
-//! PDF source. It composes the existing [`crate::pipeline::IngestPipeline`]
-//! (which runs the pre-effect guard [`crate::ingest::gate_pdf`] before any
+//! source (PDF, Markdown, or plain text). It composes the existing
+//! [`crate::pipeline::IngestPipeline`] (which runs the pre-effect guard
+//! [`crate::ingest::gate_pdf`]/[`crate::ingest::gate_sections`] before any
 //! embedding call or store write) over caller-supplied
 //! [`crate::embedding::Embedder`], [`crate::fingerprint::FingerprintReader`]
 //! and [`crate::transaction::SourceReplacer`] ports.
@@ -46,12 +47,12 @@ where
         }
     }
 
-    /// Ingests one PDF source from disk.
+    /// Ingests one source from disk (PDF, Markdown, or plain text).
     ///
-    /// Delegates to [`IngestPipeline::ingest_pdf_path`], which runs the guard
-    /// before any effect. A rejection returns [`IngestOutcome::Rejected`]
-    /// without any embedding call or store write, so the previously stored
-    /// rows are untouched.
+    /// Delegates to [`IngestPipeline::ingest_path`], which selects the loader by
+    /// extension and runs the pre-effect guard before any effect. A rejection
+    /// returns [`IngestOutcome::Rejected`] without any embedding call or store
+    /// write, so the previously stored rows are untouched.
     pub fn ingest_source(
         &self,
         path: &Path,
@@ -65,7 +66,7 @@ where
             self.config.corpus.clone(),
         );
         let pipeline = IngestPipeline::new(self.embedder, self.reader, self.replacer, config);
-        pipeline.ingest_pdf_path(path, source, content_hash)
+        pipeline.ingest_path(path, source, content_hash)
     }
 }
 

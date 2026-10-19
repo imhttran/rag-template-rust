@@ -1,4 +1,4 @@
-.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-clean-checkout transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
+.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-clean-checkout rust-acceptance-k3 rust-acceptance-ingest-md-text rust-acceptance-live-rag rust-acceptance-functional transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
 # Convenience targets for the ingest/query workflow.
 #
 #   make db-up        start PostgreSQL and apply the schema
@@ -124,6 +124,21 @@ rust-acceptance-evidence:
 
 rust-acceptance-clean-checkout:
 	cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml
+
+# RUST-007E functional-closure acceptance. These need the dedicated database;
+# the live target additionally needs a real Ollama. They are explicit targets
+# rather than part of `rust-check` so an ordinary edit loop does not require
+# either service.
+rust-acceptance-k3:
+	cargo test --locked --manifest-path rust/acceptance/k3_parity/Cargo.toml
+
+rust-acceptance-ingest-md-text:
+	cargo test --locked --manifest-path rust/acceptance/ingest_md_text/Cargo.toml
+
+rust-acceptance-live-rag:
+	cargo test --locked --manifest-path rust/acceptance/live_rag/Cargo.toml
+
+rust-acceptance-functional: rust-acceptance-k3 rust-acceptance-ingest-md-text
 
 transition-evidence: rust-acceptance-evidence rust-acceptance-clean-checkout
 

@@ -41,7 +41,11 @@ targets run the Rust suite and the RUST-007B transition evidence.
 | `make rust-clippy`                  | `cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings` |
 | `make rust-acceptance-evidence`     | `cargo test --locked --manifest-path rust/acceptance/evidence/Cargo.toml` |
 | `make rust-acceptance-clean-checkout` | `cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml` |
-| `make transition-evidence`          | both RUST-007B acceptance crates                                     |
+| `make rust-acceptance-k3`          | K=3 Go/Rust evaluation parity against the frozen reference          |
+| `make rust-acceptance-ingest-md-text` | production Markdown/plain-text ingestion and transaction safety   |
+| `make rust-acceptance-live-rag`    | live Ollama + PostgreSQL ingest → query → cited-answer verification  |
+| `make rust-acceptance-functional`  | K=3 parity + Markdown/plain-text ingestion (needs the database)      |
+| `make transition-evidence`          | the RUST-007B acceptance crates                                     |
 | `make rust-check`                   | fmt, build, test, clippy, and transition evidence                    |
 | `make check`                        | Go unit tests, `rust-check`, and the web checks                      |
 

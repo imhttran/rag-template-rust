@@ -3,7 +3,7 @@
 Repository: https://github.com/imhttran/rag-template-rust
 Target path: `docs/plans/PLAN-RUST-MIGRATION.md`
 Created: 2026-10-17
-Status: DRAFT — execution has not started.
+Status: ACTIVE — RUST-001 through RUST-007E verified; RUST-008A, RUST-007C, and RUST-008 are pending.
 
 ## Project
 
@@ -868,6 +868,10 @@ present and do not start the Rust-only transition.
 - criterion 3: check 6
 - criterion 4: check 7
 - criterion 5: check 9
+
+### Execution
+
+- verify-first
 
 ### Work Steps
 

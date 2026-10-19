@@ -7,7 +7,9 @@
 //! calls it once per source. There is no second pipeline here: the service
 //! delegates to the single [`IngestPipeline`] implementation.
 //!
-//! Usage: `ingest <source.pdf>`.
+//! Usage: `ingest <source>` where the extension selects the loader: `.pdf`
+//! (text layer), `.md`/`.markdown` (section parser), or `.txt` (one plain-text
+//! section).
 //!
 //! `source` (the stored identity) defaults to the file name of the CLI path;
 //! override it with `RAG_SOURCE`. The corpus identity defaults to `trusted` and
@@ -99,8 +101,8 @@ fn source_path() -> Result<PathBuf, String> {
     let mut args = env::args().skip(1);
     match (args.next(), args.next()) {
         (Some(path), None) => Ok(PathBuf::from(path)),
-        (None, _) => Err("usage: ingest <source.pdf>".to_string()),
-        (Some(_), Some(_)) => Err("usage: ingest <source.pdf> (exactly one argument)".to_string()),
+        (None, _) => Err("usage: ingest <source> (PDF, Markdown, or plain text)".to_string()),
+        (Some(_), Some(_)) => Err("usage: ingest <source> (exactly one argument)".to_string()),
     }
 }
 

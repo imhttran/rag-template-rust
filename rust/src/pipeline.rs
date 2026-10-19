@@ -16,6 +16,8 @@
 //! through ports, so a caller-level test records every call and proves that a
 //! rejected source causes zero embedding calls and zero writes.
 
+use std::ffi::OsStr;
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use thiserror::Error;
@@ -25,8 +27,8 @@ use crate::embedding::{Embedder, EmbeddingError};
 use crate::fingerprint::{
     fingerprint, unchanged_source, ChunkerConfig, FingerprintReader, UnchangedSource,
 };
-use crate::ingest::{gate_pdf, IngestRejection};
-use crate::loader::{load_pdf, PdfError, PdfExtraction};
+use crate::ingest::{gate_pdf, gate_sections, IngestRejection};
+use crate::loader::{load_markdown, load_pdf, load_text, PdfError, PdfExtraction};
 use crate::storage::StoredChunk;
 use crate::transaction::{validate_all_dims, ReplaceError, SourceReplacer};
 
@@ -147,6 +149,72 @@ where
         content_hash: &str,
     ) -> Result<IngestOutcome, PipelineError> {
         self.ingest_pdf(load_pdf(path), source, content_hash)
+    }
+
+    /// Ingests one source from disk, dispatching on the loader the baseline's
+    /// registry selects: `.pdf` through the PDF text-layer loader, `.md` and
+    /// `.markdown` through the Markdown section parser, and `.txt` through the
+    /// plain-text loader. An unknown extension is rejected before any effect.
+    ///
+    /// Markdown and plain text are page-less, so they pass through
+    /// [`gate_sections`]; the PDF path keeps [`gate_pdf`] and its incomplete-page
+    /// rejection. Both paths converge on [`Self::after_guard`], so chunking,
+    /// embedding, fingerprinting, and transactional replacement are identical.
+    pub fn ingest_path(
+        &self,
+        path: &Path,
+        source: &str,
+        content_hash: &str,
+    ) -> Result<IngestOutcome, PipelineError> {
+        let extension = path
+            .extension()
+            .and_then(OsStr::to_str)
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        match extension.as_str() {
+            "pdf" => self.ingest_pdf_path(path, source, content_hash),
+            "md" | "markdown" => match std::fs::read_to_string(path) {
+                Ok(text) => {
+                    let sections = load_markdown(&text);
+                    self.ingest_sections(sections, source, content_hash)
+                }
+                Err(err) => Ok(IngestOutcome::Rejected(IngestRejection::Loader(format!(
+                    "read {}: {err}",
+                    path.display()
+                )))),
+            },
+            "txt" => match load_text(path) {
+                Ok(sections) => self.ingest_sections(sections, source, content_hash),
+                Err(err) => Ok(IngestOutcome::Rejected(IngestRejection::Loader(format!(
+                    "read {}: {err}",
+                    path.display()
+                )))),
+            },
+            _ => Ok(IngestOutcome::Rejected(IngestRejection::Loader(format!(
+                "no loader for {}",
+                path.display()
+            )))),
+        }
+    }
+
+    /// Ingests page-less sections (Markdown/plain text) through the same
+    /// pre-effect gate and post-guard path as a PDF.
+    fn ingest_sections(
+        &self,
+        sections: Vec<crate::document::Section>,
+        source: &str,
+        content_hash: &str,
+    ) -> Result<IngestOutcome, PipelineError> {
+        match gate_sections(
+            sections,
+            source,
+            &self.config.language,
+            self.config.chunker.size,
+            self.config.chunker.overlap,
+        ) {
+            Ok(chunks) => self.after_guard(source, content_hash, chunks),
+            Err(rejection) => Ok(IngestOutcome::Rejected(rejection)),
+        }
     }
 
     /// The steps after the guard: unchanged check, embedding, replacement.
@@ -457,6 +525,104 @@ mod tests {
         assert_eq!(replacer.counts().replacements, 1);
         assert_eq!(replacer.counts().rows_written, chunks);
         assert_eq!(replacer.rows_for("text-layer.pdf").len(), chunks);
+    }
+
+    #[test]
+    fn markdown_source_is_chunked_and_embedded_without_a_page() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.md");
+        std::fs::write(&path, "## Intro\nalpha beta\n## Fees\ngamma delta").unwrap();
+
+        let embedder = RecordingEmbedder::new(EMBEDDING_DIM);
+        let reader = NoRows;
+        let replacer = RecordingSourceReplacer::new();
+        let pipeline = IngestPipeline::new(&embedder, &reader, &replacer, config());
+
+        let outcome = pipeline.ingest_path(&path, "policy.md", "hash").unwrap();
+        let IngestOutcome::Replaced { chunks, .. } = outcome else {
+            panic!("expected a replacement, got {outcome:?}");
+        };
+        assert_eq!(chunks, 2);
+        assert_eq!(embedder.calls(), 2);
+        assert_eq!(replacer.counts().replacements, 1);
+        let rows = replacer.rows_for("policy.md");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].section.as_deref(), Some("Intro"));
+        assert_eq!(rows[1].section.as_deref(), Some("Fees"));
+        assert!(
+            rows.iter().all(|row| row.page.is_none()),
+            "Markdown rows stay page-less"
+        );
+        assert_eq!(rows[0].chunk_index, 0);
+        assert_eq!(rows[1].chunk_index, 1);
+        assert_eq!(rows[0].language.as_deref(), Some("english"));
+    }
+
+    #[test]
+    fn plain_text_source_is_one_page_less_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("note.txt");
+        std::fs::write(&path, "## not a heading\nplain body").unwrap();
+
+        let embedder = RecordingEmbedder::new(EMBEDDING_DIM);
+        let reader = NoRows;
+        let replacer = RecordingSourceReplacer::new();
+        let pipeline = IngestPipeline::new(&embedder, &reader, &replacer, config());
+
+        let outcome = pipeline.ingest_path(&path, "note.txt", "hash").unwrap();
+        let IngestOutcome::Replaced { chunks, .. } = outcome else {
+            panic!("expected a replacement, got {outcome:?}");
+        };
+        assert_eq!(chunks, 1);
+        let rows = replacer.rows_for("note.txt");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].section.as_deref(), Some("note.txt"));
+        assert_eq!(rows[0].content, "## not a heading plain body");
+        assert!(rows[0].page.is_none());
+    }
+
+    #[test]
+    fn empty_markdown_is_rejected_without_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.md");
+        std::fs::write(&path, "   \n").unwrap();
+
+        let embedder = RecordingEmbedder::new(EMBEDDING_DIM);
+        let reader = NoRows;
+        let replacer = RecordingSourceReplacer::new();
+        let pipeline = IngestPipeline::new(&embedder, &reader, &replacer, config());
+
+        let outcome = pipeline.ingest_path(&path, "empty.md", "hash").unwrap();
+        assert_eq!(
+            outcome,
+            IngestOutcome::Rejected(IngestRejection::NoChunks {
+                source: "empty.md".to_string()
+            })
+        );
+        assert_eq!(embedder.calls(), 0);
+        assert_eq!(replacer.counts().replacements, 0);
+    }
+
+    #[test]
+    fn unknown_extension_is_rejected_without_effects() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("document.bin");
+        std::fs::write(&path, "bytes").unwrap();
+
+        let embedder = RecordingEmbedder::new(EMBEDDING_DIM);
+        let reader = NoRows;
+        let replacer = RecordingSourceReplacer::new();
+        let pipeline = IngestPipeline::new(&embedder, &reader, &replacer, config());
+
+        let outcome = pipeline.ingest_path(&path, "document.bin", "hash").unwrap();
+        match outcome {
+            IngestOutcome::Rejected(IngestRejection::Loader(message)) => {
+                assert!(message.contains("no loader for"), "{message}");
+            }
+            other => panic!("expected a loader rejection, got {other:?}"),
+        }
+        assert_eq!(embedder.calls(), 0);
+        assert_eq!(replacer.counts().replacements, 0);
     }
 
     #[test]

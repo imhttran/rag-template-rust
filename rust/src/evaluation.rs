@@ -340,6 +340,10 @@ pub fn evaluate_sql<E: Embedder + ?Sized>(
             .map_err(|err| EvalError::Database(format!("keyword search: {err}")))?;
         let fused =
             crate::retrieval_pg::fuse(&[vector_hits, keyword_hits], settings.final_k.max(1));
+        // The Go baseline deduplicates sections after fusing at FINAL_K, so a
+        // section contributes only its highest-ranked chunk. The ranking and
+        // metrics must use that same list.
+        let fused = crate::retrieval::dedup::dedup_sections(fused);
         let ranking: Vec<RankedChunk> = fused
             .iter()
             .map(|candidate| RankedChunk {

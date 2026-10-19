@@ -6,7 +6,8 @@ stores them in PostgreSQL with pgvector, retrieves the closest chunks for a
 question, and asks a local model to answer using only those chunks. Separate
 commands score retrieval quality and run a bilingual evaluation harness.
 
-Four commands drive it — `cmd/ingest` loads a document, `cmd/rag` answers a
+Four commands drive it — `cmd/ingest` loads a document (PDF, Markdown, or plain
+text), `cmd/rag` answers a
 question, `cmd/eval` scores retrieval, and `cmd/expbilingual` runs the RAG-024
 bilingual evaluation arms. The full list, including the `make` shortcuts, is in
 the [command reference](docs/reference/commands.md).
