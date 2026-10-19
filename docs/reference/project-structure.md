@@ -1,70 +1,82 @@
 # Project structure
 
+The repository is a single Rust package at the root plus the Next.js UI. The Go
+implementation was removed by RUST-007C; its pinned provenance remains in
+[`rust-transition-evidence.md`](../reference/rust-transition-evidence.md).
+
 ```text
-rag-template/
-├── cmd/
-│   ├── eval/              # score retrieval and compare reranking
-│   ├── ingest/            # chunk a file into the documents table
-│   └── rag/               # answer a question from the stored documents
-├── internal/
-│   ├── answerability/     # ask the chat model whether the evidence answers the question
-│   ├── chunking/          # sections -> chunks
-│   ├── citations/         # parse/validate/repair [source - section] citations (RAG-013)
-│   ├── config/            # settings + Ollama/Postgres setup
-│   ├── contextbudget/     # deterministic byte-estimate context budget (RAG-010)
-│   ├── document/          # parse markdown into sections
-│   ├── embedding/         # text -> vector (Ollama /api/embed)
-│   ├── generation/        # prompt -> answer (Ollama /api/generate)
-│   ├── ingestion/         # replace a source's chunks + embeddings atomically
-│   ├── loader/            # pluggable format loaders + Registry/Dispatch (RAG-006)
-│   ├── observability/     # per-run reporter: human output or JSON slog (RAG-014)
-│   ├── ollama/            # shared JSON client for the Ollama server
-│   ├── provider/          # embedder/generator provider registry (RAG-004)
-│   ├── rag/               # rewrite the question, build the answer prompt
-│   ├── reranking/         # lexical + LLM rerankers (with fallback + guard, RAG-012)
-│   └── retrieval/         # pgvector search, RRF fusion, section expansion, filters
-├── migrations/
-│   ├── 001_init.sql                # pgvector extension + documents table + index
-│   ├── 002_ingestion_metadata.sql  # provenance columns (hash/model/dim/chunker/ingested_at) (RAG-003)
-│   ├── 003_add_language.sql        # nullable per-document language (RAG-009)
-│   └── 004_page.sql                # nullable per-chunk page number (RAG-017)
-├── evals/
-│   └── retrieval.json     # questions + expected source/section
-├── scripts/
-│   ├── sweep.sh           # compare cmd/eval metrics across settings
-│   └── eval-model-sweep.sh # per-model MIN_SIMILARITY sweep on a calibration split
-├── docs/
-│   ├── README.md          # documentation index and authority model
-│   ├── requirements/      # PRD.md (canonical), PRD-Phase-23b.md (proposed)
-│   ├── architecture/      # OVERVIEW.md (pipeline, packages, boundaries)
-│   ├── reference/         # commands, configuration, capabilities, testing, experiments
-│   ├── guides/            # usage, evaluation, git hooks + agent scripts
-│   ├── operations/        # operator-run procedures (embedding dimension/models, page provenance, prompt injection)
-│   ├── plans/             # PLAN.md and focused, SOP-compatible task plans (RAG-*)
-│   ├── history/           # LESSONS.md (retrospective)
-│   └── experiments-eval-sweep.md  # recorded embedding-model sweep (script output path)
-├── examples/
-│   ├── loan-policy.md                  # sample corpus for cmd/ingest
-│   ├── large-loan-policy.md            # longer corpus; several chunks per section
-│   ├── member-services-guide.md        # distractor corpus for the evaluation
-│   ├── commercial-servicing-manual.md  # long sections; exercises CHUNK_SIZE / CHUNK_OVERLAP
-│   └── vi/                             # Vietnamese corpora for the multilingual evaluation
-├── .agents/
-│   └── scripts/                        # agent scripts; project-agnostic
-│       ├── audit-agent.sh              # over-engineering audit, writes AUDIT.md
-│       ├── integration-test-agent.sh   # run the integration tests
-│       └── review-agent.sh             # code review agent
-├── .githooks/
-│   ├── pre-commit         # tidy / fmt / jq / vet / staticcheck / test / build
-│   └── pre-push           # integration tests
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── Makefile
-├── go.mod
-├── go.sum
-└── README.md
+.
+├── Cargo.toml                 # rag-foundation package and binary targets
+├── Cargo.lock                 # committed dependency lock
+├── rust-toolchain.toml        # pinned toolchain/components
+├── src/
+│   ├── lib.rs                 # library module exports
+│   ├── api.rs                 # Axum router, handlers, validation
+│   ├── config.rs              # environment configuration
+│   ├── document.rs            # Section/Chunk domain types
+│   ├── loader/                # Markdown, plain-text, PDF loaders
+│   ├── section.rs             # `## ` section parser
+│   ├── chunker.rs             # overlapping word chunks
+│   ├── ingest.rs              # pre-effect guard (PDF/page-less)
+│   ├── fingerprint.rs         # content fingerprint and unchanged check
+│   ├── pipeline.rs            # single ingest pipeline (format dispatch)
+│   ├── service.rs             # IngestService seam
+│   ├── transaction.rs         # transactional source replacement
+│   ├── storage.rs             # schema contract and embedding guard
+│   ├── storage_pg.rs          # r2d2 + PostgreSQL/pgvector client
+│   ├── embedding.rs           # Ollama `/api/embed`
+│   ├── generation.rs          # Ollama `/api/generate`
+│   ├── ollama.rs              # shared HTTP client/transport
+│   ├── provider.rs            # embed/generate provider registry
+│   ├── retrieval/             # vector, FTS, fusion, dedup, expand, filters
+│   ├── retrieval_pg.rs        # SQL vector/FTS fusion path
+│   ├── answer/                # prompt, budget, citation validation, service
+│   ├── query_service.rs       # shared CLI/API question path
+│   ├── evaluation.rs          # recall/precision harness
+│   ├── bilingual.rs           # RAG-024 experiment harness
+│   ├── bin/
+│   │   ├── ingest.rs          # production ingest CLI
+│   │   ├── query.rs           # production question → cited answer CLI
+│   │   ├── eval.rs            # production evaluation CLI
+│   │   ├── expbilingual.rs    # bilingual experiment CLI
+│   │   ├── api.rs             # Axum API binary
+│   │   └── smoke.rs           # optional live Ollama smoke check
+├── tests/                     # schema, parity, binary, and integration tests
+├── acceptance/                # separate acceptance crates
+│   ├── api_contract/
+│   ├── bilingual_parity/
+│   ├── clean_checkout/
+│   ├── e2e/
+│   ├── eval_parity/
+│   ├── evidence/
+│   ├── final_layout/
+│   ├── ingest_cli/
+│   ├── ingest_md_text/
+│   ├── k3_parity/
+│   ├── live_rag/
+│   └── retrieval_cli/
+├── fixtures/                  # frozen parity inputs/outputs and the Go reference captures
+├── migrations/                # shared PostgreSQL + pgvector schema
+├── evals/                     # frozen evaluation datasets
+├── examples/                  # sample documents
+├── web/                       # Next.js UI and Playwright browser tests
+├── scripts/                   # web-control.sh, web-e2e.sh
+├── docs/                      # requirements, architecture, reference, guides, evidence
+├── Makefile                   # Rust and web convenience targets
+├── .githooks/                 # pre-commit / pre-push Rust checks
+└── .github/workflows/ci.yml   # Rust, API-contract, and web CI
 ```
 
-The commands only wire these packages together. See
-[`../README.md`](../README.md) for the documentation index.
+## Entry points
+
+- `src/bin/ingest.rs`, `query.rs`, `eval.rs`, and `expbilingual.rs` are thin CLI
+  wrappers over the library modules.
+- `src/bin/api.rs` serves the Axum API; it calls the same `IngestService` and
+  `QueryService` as the CLI.
+- `web/` is a Next.js App Router UI. The browser calls only same-origin
+  `/api/*`; the Next.js server proxies those requests to Axum.
+
+## Generated and local state
+
+`target/`, `web/node_modules/`, `web/.next*`, `web/.run/`, `.env`, and
+`.agent-sdlc/` are git-ignored. `Cargo.lock` is committed.

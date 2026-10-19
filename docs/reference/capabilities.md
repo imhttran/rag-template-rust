@@ -3,17 +3,17 @@
 These are shipped and covered by unit tests (and, where noted, the PostgreSQL
 integration suite). They are recorded here so the code and this document agree:
 
-- **Pluggable document loader (RAG-006)** — `internal/loader` exposes a
+- **Pluggable document loader (RAG-006)** — `src/loader/` exposes a
   `Loader` interface plus a `Registry`/`Dispatch`; Markdown and plain-text
-  loaders ship today. `cmd/ingest` dispatches by loader, so a new format is added
+  loaders ship today. `src/bin/ingest.rs` dispatches by loader, so a new format is added
   by registering a loader, not by editing the ingest path. Unknown formats return
   a clear `no loader for <path>` error.
 - **Ingestion provenance and idempotent re-index (RAG-003)** — every chunk stores
   a content hash, embed model, dimension, chunker config, ingest time, and
   language; re-ingesting an unchanged file is a no-op (migrations 002/003).
 - **Model/provider independence (RAG-004/RAG-005; wired by RAG-025A)** — the commands
-  (`cmd/ingest`, `cmd/rag`, `cmd/eval`) resolve the embedder and generator through
-  `internal/provider` via `config.Config.Embedder()` / `Generator()`
+  (`src/bin/ingest.rs`, `src/bin/query.rs`, `src/bin/eval.rs`) resolve the embedder and generator through
+  `src/provider.rs` via `config.Config.Embedder()` / `Generator()`
   (`EMBED_PROVIDER` / `GEN_PROVIDER`), so a non-default provider is a registry entry,
   not a code edit. An unregistered provider name fails fast at `config.Load` (naming
   the variable and the value). `EMBED_DIM` is validated against the stored column
@@ -25,16 +25,16 @@ integration suite). They are recorded here so the code and this document agree:
   prefix with LIKE-escaping, language, ingested-date range) narrows vector search,
   keyword search, and section expansion; a zero filter is byte-identical to the
   unfiltered query.
-- **Deterministic context budget (RAG-010)** — `internal/contextbudget` selects a
+- **Deterministic context budget (RAG-010)** — `src/answer/context_budget.rs` selects a
   subset of ranked documents whose byte-estimated size fits `CONTEXT_BUDGET`
   (higher-rank priority, round-robin fairness, oversize chunks excluded); `0`
   disables it and keeps the chunk-count behaviour.
 - **Reranking hardening (RAG-012)** — a malformed, slow, or failed LLM reranker
   degrades to the fused order (bounded by `RERANK_TIMEOUT`) instead of aborting the
   request; the default stays off.
-- **Structured citation validation (RAG-013)** — `internal/citations` parses,
+- **Structured citation validation (RAG-013)** — `src/answer/citation.rs` parses,
   validates, and repairs `[source - section]` citations; `RAG_CITATION_VALIDATION`
-  runs it in `cmd/rag` (off by default), reusing the parser that `cmd/eval`
+  runs it in `src/bin/query.rs` (off by default), reusing the parser that `src/bin/eval.rs`
   already used.
 - **Structured observability (RAG-014)** — `OBSERVABILITY_FORMAT=json` emits one
   correlated `log/slog` record per run (run ID, stage timings, counts, context
@@ -47,7 +47,7 @@ integration suite). They are recorded here so the code and this document agree:
 
 ## Phase 23b capabilities
 
-- **PDF text-layer ingestion (RAG-007)** — `internal/loader` registers a PDF
+- **PDF text-layer ingestion (RAG-007)** — `src/loader/` registers a PDF
   loader that extracts one section per page from the PDF text layer; a PDF with no
   text layer (a scan) is rejected explicitly until OCR is authorized.
 - **Page provenance and page-aware citations (RAG-017)** — a 1-based page number

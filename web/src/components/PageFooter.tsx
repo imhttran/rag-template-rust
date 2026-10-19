@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export const VERSION = "0.0.1-prototype";
+export const VERSION = "0.1.0";
 
 export function PageFooter({ meta }: { meta?: ReactNode }) {
   return (

@@ -1,20 +1,8 @@
-# Compiled binaries from cmd/rag and cmd/ingest
-/rag
-/ingest
-/interop
-
-# Go build and test artifacts
-*.exe
-*.test
-*.out
-/dist/
-
-# Rust build artifacts (Go -> Rust port; Cargo.lock is committed for the binaries).
-# Unanchored so a nested rust/target/ is ignored too, before and after RUST-007
-# moves the package to the repository root.
+# Rust build artifacts (Cargo.lock is committed for the binaries).
+# Unanchored so nested acceptance-crate target directories are ignored too.
 target/
 
-# Local environment overrides (config is read from env vars)
+# Local environment overrides (configuration is read from env vars)
 .env
 .env.*
 !.env.example

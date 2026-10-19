@@ -194,7 +194,7 @@ valid target.
 The sweep records two process-level numbers per run, and they are deliberately
 labelled to say what they are:
 
-- **`run wall (s)`** is the wall-clock time of the whole `go run ./cmd/eval`
+- **`run wall (s)`** is the wall-clock time of the whole `cargo run --locked --bin eval`
   subprocess on the isolated database. It is **client-observed** and includes the
   Go build, the eval client, and database work — it is **not** embedding-only
   latency.
@@ -246,14 +246,14 @@ the results header, so the configuration a run used is auditable.
    `dich-vu-thanh-vien.md`, `quy-trinh-thu-hoi.md`, and `bao-hiem-tai-san.md`:
 
    ```bash
-   go run ./cmd/ingest examples/loan-policy.md
-   go run ./cmd/ingest examples/large-loan-policy.md
-   go run ./cmd/ingest examples/member-services-guide.md
-   go run ./cmd/ingest examples/commercial-servicing-manual.md
-   go run ./cmd/ingest examples/vi/chinh-sach-khoan-vay.md
-   go run ./cmd/ingest examples/vi/dich-vu-thanh-vien.md
-   go run ./cmd/ingest examples/vi/quy-trinh-thu-hoi.md
-   go run ./cmd/ingest examples/vi/bao-hiem-tai-san.md
+   cargo run --locked --bin ingest examples/loan-policy.md
+   cargo run --locked --bin ingest examples/large-loan-policy.md
+   cargo run --locked --bin ingest examples/member-services-guide.md
+   cargo run --locked --bin ingest examples/commercial-servicing-manual.md
+   cargo run --locked --bin ingest examples/vi/chinh-sach-khoan-vay.md
+   cargo run --locked --bin ingest examples/vi/dich-vu-thanh-vien.md
+   cargo run --locked --bin ingest examples/vi/quy-trinh-thu-hoi.md
+   cargo run --locked --bin ingest examples/vi/bao-hiem-tai-san.md
    ```
 
 4. Score the calibration split to choose the operating floor, then score the
@@ -261,8 +261,8 @@ the results header, so the configuration a run used is auditable.
    the split you report:
 
    ```bash
-   EVAL_DATASET=evals/retrieval-vi-en-calibration.json go run ./cmd/eval
-   EVAL_DATASET=evals/retrieval-vi-en-expanded.json go run ./cmd/eval
+   EVAL_DATASET=evals/retrieval-vi-en-calibration.json cargo run --locked --bin eval
+   EVAL_DATASET=evals/retrieval-vi-en-expanded.json cargo run --locked --bin eval
    ```
 
 5. Repeat steps 2–4 for the candidate model, using a **separate isolated

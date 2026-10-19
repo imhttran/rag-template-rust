@@ -1,5 +1,12 @@
 # Embedding-model sweep results
 
+> **Historical record.** These results were captured with the Go
+> `scripts/eval-model-sweep.sh` and `cmd/eval`; the Go implementation and those
+> scripts were removed by RUST-007C. The measurements remain valid evidence for
+> the model/floor decision, but new runs use
+> `cargo run --locked --bin eval`. The Rust port has no replacement for the
+> settings-matrix sweep script.
+
 Recorded by `scripts/eval-model-sweep.sh`. Two sets are shown: the **final
 calibrated evaluation** (the RAG-021 result) and the **historical exploratory**
 rows it supersedes.
@@ -54,7 +61,7 @@ earlier recall-only rule that allowed a zero-rejection floor to win on recall.
 
 ## Measurement labels
 
-- `run wall (s)` — wall-clock of the whole `go run ./cmd/eval` subprocess
+- `run wall (s)` — wall-clock of the whole `cargo run --locked --bin eval` subprocess
   (client-observed; includes the Go build, the eval client, and database work),
   **not** embedding-only latency.
 - `client RSS (KiB)` — peak resident set size of that eval client process, **not**
@@ -193,8 +200,8 @@ reconciliation header above; they do not overwrite any RAG-021 row.
 
 ### Validation provenance (RAG-023D)
 
-RAG-023D's **SOP-observed** gate was `go build ./...`, `go test ./...`, and
-`go vet ./...` over a documentation-only diff (`docs/experiments-eval-sweep.md`,
+RAG-023D's **SOP-observed** gate was `cargo build --locked`, `cargo test --locked`, and
+`cargo clippy --locked --all-targets -- -D warnings` over a documentation-only diff (`docs/experiments-eval-sweep.md`,
 `docs/reference/experiments.md`). The SOP run did **not** itself execute database
 integration or the model sweep.
 

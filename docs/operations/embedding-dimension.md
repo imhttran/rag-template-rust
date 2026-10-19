@@ -103,7 +103,7 @@ make ingest FILE=examples/commercial-servicing-manual.md
 or, for a single file:
 
 ```bash
-go run ./cmd/ingest examples/loan-policy.md
+cargo run --locked --bin ingest examples/loan-policy.md
 ```
 
 Use the same embedding model you sized the column for.
@@ -114,7 +114,7 @@ The guard is the check the commands run; run it directly if you want to confirm
 before ingesting:
 
 ```bash
-RAG_INTEGRATION=1 go test ./internal/ingestion/ -run IntegrationEmbeddingDim -v
+cargo test --locked --lib storage::tests
 ```
 
 A configured/stored mismatch returns the actionable error shown above; a match

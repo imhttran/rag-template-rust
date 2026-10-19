@@ -1,18 +1,16 @@
-.PHONY: db-up db-down db-schema test fmt-json integration ingest ask eval sweep rust-build rust-test rust-fmt rust-clippy rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check
-# Convenience targets for the ingest/query workflow.
+.PHONY: db-up db-down db-schema test fmt-json ingest ask eval rust-build rust-test rust-fmt rust-clippy rust-acceptance-evidence rust-acceptance-final-layout rust-acceptance-clean-checkout rust-acceptance-k3 rust-acceptance-ingest-md-text rust-acceptance-live-rag rust-acceptance-api-contract rust-acceptance-functional transition-evidence rust-check check web-check-env web-install web-start web-stop web-status web-typecheck web-build web-check web-e2e
+# Convenience targets for the Rust-only ingest/query workflow.
 #
 #   make db-up        start PostgreSQL and apply the schema
 #   make db-schema    (re)apply every migration in migrations/
-#   make test         unit tests (no database needed)
+#   make test         Rust unit and integration tests
 #   make fmt-json     rewrite every tracked JSON file with jq
-#   make integration  tests against the docker-compose database (needs Docker)
 #   make ingest       load examples/loan-policy.md
 #   make ask Q="…"    ask a question (omit Q to be prompted)
 #   make eval         score retrieval against evals/retrieval.json
-#   make sweep        compare eval metrics across settings
-#   make web-start    start the Next.js prototype on 127.0.0.1:3000 (background)
-#   make web-stop     stop the prototype started by make web-start
-#   make web-status   report the prototype's state, URL, and log path
+#   make web-start    start the Next.js UI on 127.0.0.1:3000 (background)
+#   make web-stop     stop the Next.js server started by make web-start
+#   make web-status   report the server state, URL, and log path
 #
 # Override inputs on the command line, e.g.
 #   make ingest FILE=examples/other.md
@@ -24,7 +22,6 @@ DATABASE_URL ?= postgres://rag:rag@127.0.0.1:5434/rag?sslmode=disable
 export DATABASE_URL
 FILE ?= examples/loan-policy.md
 Q ?=
-AXIS ?= all
 
 # Start the database and make sure the schema is applied.
 db-up:
@@ -35,10 +32,10 @@ db-up:
 db-down:
 	docker compose down
 
-
-# Run the unit tests; no database required.
+# Run the Rust tests. Database-backed tests need DATABASE_URL; the suite fails
+# rather than skips when the configured database is unavailable.
 test:
-	go test ./...
+	cargo test --locked
 
 # Rewrite every tracked JSON file with jq's formatting. This expands the
 # hand-compacted one-line arrays in .zed/settings.json and evals/retrieval.json,
@@ -50,75 +47,70 @@ fmt-json:
 		mv "$$f.tmp" "$$f"; \
 	done
 
-# Run the PostgreSQL integration tests against the docker-compose database,
-# starting it first. The tests truncate or delete from the documents table, so
-# override DATABASE_URL to point at a throwaway database instead of the dev one.
-#
-# -p 1 runs the packages one at a time: internal/retrieval truncates the whole
-# table, which would fight internal/ingestion's tests if they ran in parallel.
-integration: db-up
-	RAG_INTEGRATION=1 go test ./internal/retrieval/ ./internal/ingestion/ -run Integration -p 1 -v
-
 # Chunk FILE and store it (safe to re-run).
 ingest:
-	go run ./cmd/ingest $(FILE)
+	cargo run --locked --bin ingest $(FILE)
 
 # Ask a question; omit Q to be prompted.
 ask:
-	go run ./cmd/rag "$(Q)"
+	cargo run --locked --bin query "$(Q)"
 
 # Score retrieval against evals/retrieval.json.
 eval:
-	go run ./cmd/eval
-
-# Compare cmd/eval metrics across a matrix of settings (see scripts/sweep.sh).
-sweep:
-	./scripts/sweep.sh $(AXIS)
+	cargo run --locked --bin eval
 
 db-schema:
 	@for f in migrations/*.sql; do \
 		psql "$$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
 	done
 
-# ---- Web UI prototype (Next.js, UI-002) ----------------------------------------
-# Manage the local prototype on 127.0.0.1:3000. PID and log live under web/.run/
-# (git-ignored). Node/npm are found on PATH or via the Zed-bundled installation;
-# override with NODE_BIN=... / NPM_BIN=... The prototype serves mock data only.
-web-start:
-	./scripts/web-control.sh start
-
-web-stop:
-	./scripts/web-control.sh stop
-
-web-status:
-	./scripts/web-control.sh status
-
-# Resolve and validate the Node/npm toolchain (overrides -> PATH -> Zed bundled).
-web-check-env:
-	./scripts/web-control.sh check-env
-
-# Install web dependencies with the resolved toolchain.
-web-install:
-	./scripts/web-control.sh install
-
-# ---- Rust checks (the port under rust/) ----------------------------------------
-# Reused by .githooks so the hooks and the Makefile never diverge. The Rust
-# package still lives at rust/ until RUST-007 moves it to the root.
+# ---- Rust checks (the package lives at the repository root) -------------------
+# Reused by .githooks so the hooks and the Makefile never diverge.
 rust-fmt:
-	cargo fmt --manifest-path rust/Cargo.toml --check
+	cargo fmt --check
 
 rust-build:
-	cargo build --locked --manifest-path rust/Cargo.toml
+	cargo build --locked
 
 rust-test:
-	cargo test --locked --manifest-path rust/Cargo.toml
+	cargo test --locked
 
 rust-clippy:
-	cargo clippy --locked --all-targets --manifest-path rust/Cargo.toml -- -D warnings
+	cargo clippy --locked --all-targets -- -D warnings
 
-rust-check: rust-fmt rust-build rust-test rust-clippy
+# RUST-007C final-layout and clean-checkout acceptance.
+rust-acceptance-evidence:
+	cargo test --locked --manifest-path acceptance/evidence/Cargo.toml
 
-# ---- Web checks (the Next.js prototype under web/) -----------------------------
+rust-acceptance-final-layout:
+	cargo test --locked --manifest-path acceptance/final_layout/Cargo.toml
+
+rust-acceptance-clean-checkout:
+	cargo test --locked --manifest-path acceptance/clean_checkout/Cargo.toml
+
+# RUST-007E functional-closure acceptance. These need the dedicated database;
+# the live target additionally needs a real Ollama. They are explicit targets
+# rather than part of `rust-check` so an ordinary edit loop does not require
+# either service.
+rust-acceptance-k3:
+	cargo test --locked --manifest-path acceptance/k3_parity/Cargo.toml
+
+rust-acceptance-ingest-md-text:
+	cargo test --locked --manifest-path acceptance/ingest_md_text/Cargo.toml
+
+rust-acceptance-live-rag:
+	cargo test --locked --manifest-path acceptance/live_rag/Cargo.toml
+
+rust-acceptance-api-contract:
+	cargo test --locked --manifest-path acceptance/api_contract/Cargo.toml
+
+rust-acceptance-functional: rust-acceptance-k3 rust-acceptance-ingest-md-text
+
+transition-evidence: rust-acceptance-evidence rust-acceptance-final-layout rust-acceptance-clean-checkout
+
+rust-check: rust-fmt rust-build rust-test rust-clippy transition-evidence
+
+# ---- Web checks (the Next.js UI under web/) -------------------------------------
 web-typecheck:
 	./scripts/web-control.sh typecheck
 
@@ -127,5 +119,10 @@ web-build:
 
 web-check: web-typecheck web-build
 
-# Everything: the Go reference unit tests, the Rust checks, and the web checks.
+# Real-browser E2E. Starts the Axum API and Next.js, runs Playwright, and cleans
+# up only the run corpus. Needs PostgreSQL and Ollama.
+web-e2e:
+	./scripts/web-e2e.sh
+
+# Everything: the Rust checks and the web checks.
 check: test rust-check web-check

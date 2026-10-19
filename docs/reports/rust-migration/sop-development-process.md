@@ -7,7 +7,7 @@ values that cannot be established are marked UNKNOWN, and agent calls are never
 equated with user turns.
 
 - First recorded: 2026-10-17
-- Last updated: 2026-10-18 (RUST-007 eval parity fixed via shared SQL retrieval; parity and affected suites PASS; pending gate untouched)
+- Last updated: 2026-10-18 (RUST-007D bilingual implementation and scripted parity PASS; live-model criterion UNMET; pending gate)
 - SOP: `sop` on PATH, `sop version` = `sop dev` (source base `c1db733` plus the
   reviewed Cargo support and this session's agent-Cargo/gate changes;
   `/home/tomtran/go/bin/sop`, SHA-256
@@ -1785,3 +1785,469 @@ gate remains pending and was not approved.
   explicit unmet closure requirements.
 - Pending approval: **RUST-007 `NEEDS_HUMAN` / `WAITING_FOR_HUMAN`**.
 - No commit, push, merge, `state.db` edit, or budget reset.
+
+## 33. RUST-007D Claude recovery and bilingual implementation
+
+Date: 2026-10-18. One bounded RUST-007D recovery was run with the Claude command adapter after the installed SOP snapshot fix, using the existing task budget. No DeepSeek retry was made.
+
+### 33.1 Backend and context
+
+- Installed SOP: `fff8d742...`, source revision `7a1d1759...`, includes the Git-aware `SnapshotFiles` fix. No SOP rebuild.
+- Effective implementation backend: `SOP_AGENT_PROVIDER=command` with the Claude Code adapter, authenticated through the **Claude.ai Pro subscription** (`authMethod: claude.ai`), `jq` 1.7. No paid-API key and no invented spending cap.
+- The SOP report header prints `Provider: ollama` because the configured provider remains ollama; the startup/effective provider was `command`. This is a reporting-label discrepancy, not the executed backend.
+- `SOP_TASK_INPUTS` supplied a 4.2 KB recovery context with the Go `cmd/expbilingual` contract and the verified Rust SQL/retrieval/API signatures.
+- Tool restrictions: `SOP_CLAUDE_ISOLATE=1`; explicit cargo rules for build/test/fmt/clippy/generate-lockfile; no git commit/push/merge/reset/clean. The command backend does not enforce the native toolharness policy; the wrapper allow-list was the restriction.
+
+### 33.2 Outcome
+
+- Validation: all build/test/lint commands **PASS**.
+- Objective criteria 1–3 and 5: **met** (invocation mappings, arms/dataset/env, pinned generation/cache, no required check unverified).
+- Criterion 4 (live-model groundedness/citations): **UNMET**, as documented in `RUST-007D-live-model-evidence.md`. Scripted parity does not close it.
+- Outcome: `PARTIAL`; lifecycle `NEEDS_HUMAN`; RUST-007D is `PLANNED` with a pending gate. The run made meaningful repository changes; this is a required live-evidence boundary, not a no-progress failure.
+- Implementation: `rust/src/bilingual.rs`, `rust/src/bin/expbilingual.rs`, `PgStore::section_chunks` in `rust/src/storage_pg.rs`, `rust/tests/expbilingual_binary.rs`, `rust/tests/section_chunks_pg.rs`, and `rust/acceptance/bilingual_parity` with Go/Rust parity tests. The harness is evaluation-only and adds no writes.
+- Budget: task attempts **2/3**; continuations **2/4** (2 remaining). Aggregate run counts: 4 attempts, 2 continuations, 4 invocations, 9 model calls. Current run metrics: agent calls 2, validation runs 1, review runs 1, plan repairs 0, wall 30m 26s. No budget reset.
+
+### 33.3 Remaining open requirements
+
+- Live Ollama ingest → query → cited answer and groundedness/citation evidence.
+- Original K=3 parity (current eval proof uses FINAL_K=4).
+- Markdown/plain-text ingestion.
+- Real Axum/Next.js browser flow (UI remains mock-only at `http://127.0.0.1:3000`, HTTP 200).
+- Rust-only clean checkout after required parity passes.
+- Go removal remains deferred.
+
+No merge or auto-merge was performed. RAG CI remains absent; SOP repository CI is separate.
+
+## 34. RUST-007D verified recovery, acceptance audit, and recovery binding
+
+Date: 2026-10-19. This section records the completed RUST-007D verdict. Nothing
+in `.agent-sdlc/` was edited, and no budget, attempt counter, criterion, or gate
+was reset.
+
+### 34.1 No active SOP process
+
+- No `sop run`, SOP agent, or implementation subprocess was active when this
+  record was written (`ps` showed only the long-running Next.js prototype and
+  unrelated system processes; `sop approvals --json` returned an empty list).
+- The plan is idle at `ACTIVE`; the only open work is `RUST-007B` (see §34.5).
+
+### 34.2 Verified outcome
+
+- `sop verify RUST-007D` → `status: VERIFIED`, `validation: passed`,
+  `lifecycle: LOCAL_DONE`.
+- `state.json` → `stage: PASSED`; `gate.json` → `Decision: PASS`.
+- All five required criteria are `Met`: criteria 1–3 and 5 through their mapped
+  deterministic checks; criterion 4 (live-model groundedness/citations) through
+  the operator acceptance bound to it.
+- The eight configured validation commands (Go build/test/vet/gofmt and Rust
+  build/test/fmt/clippy) all exited `0`.
+- Execution was verify-first: `report.json` records `execution_mode:
+  verify-first`, `verified_first: true`; the zero-mutation verification reused
+  the delivered implementation (`agent_calls: 0`, `agent_calls_avoided: 1`,
+  `validation_runs: 1`, `review_runs: 0`, `fix_cycles: 0`). No model call was
+  needed to close the task.
+
+### 34.3 Preserved acceptance audit
+
+- `.agent-sdlc/runs/RUST-007D/acceptance_decisions.jsonl` preserves the operator
+  decision: `criterion-4`, `decision: accept`, `approver: operator`,
+  `recorded_at: 2026-10-18T23:45:16Z`, bound to `attempt: 1`. The evidence names
+  `docs/reports/rust-migration/RUST-007D-live-model-evidence.md` and the two
+  repaired live repeats plus the Go baseline artifacts under
+  `docs/reports/rust-migration/live-007d/`.
+- `.agent-sdlc/runs/RUST-007D/acceptance_recoveries.jsonl` preserves the
+  recovery binding: `from_attempt: 1` → `to_attempt: 3`, `source: approve`,
+  `by: operator`, `recorded_at: 2026-10-19T03:34:18Z`. This is the binding that
+  moved the accepted criterion-4 evidence onto the reviewed attempt without
+  re-running the live model.
+- `.agent-sdlc/runs/RUST-007D/recovery.jsonl` records the earlier attempt-2
+  `authorization_failure` → `human` stop. It is preserved, not overwritten.
+- `approval-history.json` preserves both `NEEDS_HUMAN` requests and their
+  approvals (2026-10-18T23:45:18Z and 2026-10-19T03:34:18Z).
+- `.agent-sdlc/` remains git-ignored (`*`) and untracked; the audit is preserved
+  on disk and was not modified by this record.
+
+### 34.4 Installed SOP revision
+
+- Installed binary: `/home/tomtran/go/bin/sop`; `sop version` → `sop dev`.
+- `go version -m` build information: module
+  `github.com/imhttran/agentic-sop`, pseudo-version
+  `v0.0.0-20261019032842-205701add58c`, `vcs.revision`
+  `205701add58cfebee9b83d3e7afb86720f31cfff`, `vcs.time`
+  `2026-10-19T03:28:42Z`, `vcs.modified: false`, `go1.27.1`.
+- SHA-256: `0d1284ae195b8cbea01cd64f94623e130bc1bbcfd2ebc1db54c8af8f2f469ea3`.
+- This supersedes the `fff8d742` / `7a1d1759` snapshot named in §33.1; that
+  value described the binary used for the earlier recovery, not the binary that
+  produced the VERIFIED verdict recorded here.
+
+### 34.5 State and remaining requirements
+
+- `sop status`: RUST-007D is `LOCAL_DONE`; `RUST-007B` and `RUST-007C` remain
+  `PLANNED`; `RUST-008` remains `PLANNED`.
+- Still explicitly open (not implied closed by RUST-007D): original K=3 parity
+  (current eval proof uses `FINAL_K=4`), Markdown/plain-text ingestion, live
+  production ingest → query → cited answer, and the real Axum/Next.js browser
+  flow. The Rust-only clean checkout and Go removal remain deferred to
+  `RUST-007B`/`RUST-007C`.
+- Next unmet requirement: `RUST-007B` (freeze transition evidence and update
+  pre-removal tooling while Go remains present).
+
+## 35. RUST-007B verified — transition evidence frozen with Go present
+
+Date: 2026-10-19. Two `--max-tasks 1` runs, no state edit, no budget reset, no Go
+removal.
+
+### 35.1 Run 1 — FAILED, root cause isolated
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` executed only
+  RUST-007B. Validation passed, then two review cycles failed on HIGH findings,
+  and the run ended `FAILED` with `CONTINUE` (`INCOMPLETE_IMPLEMENTATION`).
+- Root cause: the frozen evidence record was written under `docs/reports/`, and
+  SOP deliberately excludes `docs/reports/` (and `.agent-sdlc/`) from the
+  reviewed implementation diff. The review therefore could not see the document
+  and reported it missing even though it existed.
+- Secondary defects in the same attempt: `rust/acceptance/clean_checkout_go` had
+  no `Cargo.toml`/`Cargo.lock`; the documented section was `###` while the
+  harness matched `##`; and the harness did not forward `DATABASE_URL`, so the
+  documented `make rust-test` step failed inside the staged copy.
+- `changed-files.json` and `diff.patch` from this attempt are preserved under
+  `.agent-sdlc/runs/RUST-007B/`.
+
+### 35.2 Operator corrections between runs (no SOP state written)
+
+- Moved the evidence record to `docs/reference/rust-transition-evidence.md`, a
+  path SOP includes in the reviewed diff, and updated every reference.
+- Added `rust/acceptance/clean_checkout_go/Cargo.toml` and generated both
+  acceptance `Cargo.lock` files so the `--locked` checks can run.
+- Made `Clean checkout with Go present` a top-level section in
+  `docs/guides/usage.md`, and made the clean-checkout harness read the source
+  checkout's `.env` and forward its values to the documented steps (the file is
+  never copied into the staged tree). Added unit tests for that reader.
+- Completed the pre-removal tooling: `Makefile` targets
+  `rust-acceptance-evidence`, `rust-acceptance-clean-checkout`, and
+  `transition-evidence` wired into `rust-check`; `.githooks/pre-commit` runs the
+  evidence crate and `.githooks/pre-push` runs `make transition-evidence`; and
+  `.github/workflows/ci.yml` runs the Go reference and the Rust/transition jobs
+  with both toolchains installed. The command reference documents the targets.
+
+### 35.3 Run 2 — VERIFIED
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` → RUST-007B
+  `PASSED`; `sop verify RUST-007B` → `VERIFIED`, `validation: passed`,
+  `lifecycle: LOCAL_DONE`.
+- All four checks and all four criteria are `Met`:
+  `go build ./...`, `go test ./...`, `go vet ./...`,
+  `cargo test --locked --manifest-path rust/Cargo.toml`,
+  `cargo test --locked --manifest-path rust/acceptance/evidence/Cargo.toml` (5
+  tests), and
+  `cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml`
+  (3 tests, including the staged-copy run of `go build`, `go test`, `go vet`, and
+  `make rust-test`).
+- The eight configured validation commands all passed. The run used 0 fix
+  cycles, 2 agent calls, one validation run, and one review run; wall time was
+  7m 13s.
+- The installed SOP binary is the revision recorded in §34.4
+  (`205701a…`, SHA-256 `0d1284ae…`).
+
+### 35.4 Frozen evidence and preserved state
+
+- `docs/reference/rust-transition-evidence.md` records the capability matrix,
+  remaining limitations, rollback reference, pinned Go commit SHA
+  `d72fb398e8959eea83ed24be03f6df8cdeca86a2`, the source repository URL, and the
+  fixture provenance for `migrations/*.sql`, `evals/`, `examples/`,
+  `docker-compose.yml`, and `rust/fixtures/`.
+- `rust/acceptance/clean_checkout_go` stages a working-tree copy and runs the
+  documented setup with Go present.
+- Go sources, `go.mod`, `go.sum`, and all frozen assets remain untouched. No
+  `state.db` edit, budget reset, merge, or auto-merge occurred.
+
+### 35.5 Counts and remaining requirements
+
+- RUST-007B: 2 attempts, 2 invocations, 15 model calls, 0 approvals,
+  1 continuation (the run-1 `AUTO_CONTINUE` classification).
+- `sop status`: RUST-007B is `LOCAL_DONE`; RUST-007C and RUST-008 remain
+  `PLANNED`. RUST-007C was **not** started and Go was not removed.
+- Still explicitly open: original K=3 parity (the eval proof uses `FINAL_K=4`),
+  Markdown/plain-text ingestion, live production ingest → query → cited answer,
+  and the real Axum/Next.js browser end-to-end flow.
+- Next unmet requirement: `RUST-007C` (Rust-only transition and final
+  verification), which must not start until the open parity and live-flow
+  requirements are resolved.
+
+## 36. RUST-007E functional closure — verified
+
+Date: 2026-10-19. This section supersedes §35.5's open list: the original K=3
+parity, production Markdown/plain-text ingestion, and the live production RAG
+path are now verified. Go remains present.
+
+### 36.1 Preflight and plan update
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085` (`sop dev`), matching
+  the requested revision. No SOP process was active.
+- Isolated branch: `rust-007e-functional-closure`, based on the verified
+  RUST-007B commit `2e17ee1`. RUST-007B and RUST-007D remained
+  `LOCAL_DONE`/`VERIFIED`.
+- Added `RUST-007E` (dependencies RUST-007, RUST-007D, RUST-007B) and
+  `RUST-008A` (dependency RUST-007E); changed RUST-007C to depend on RUST-007B,
+  RUST-007E, and RUST-008A. RUST-008 still depends on RUST-007C.
+- Reconcile preview: 19 unchanged, `RUST-007C` updated (never executed),
+  `RUST-007E`/`RUST-008A` added, no executed-task changes. Applied with
+  `sop reconcile`.
+- RUST-007E was later switched to `Execution: verify-first` after its first
+  implementation attempt failed. SOP required the executed-definition change to
+  be accepted explicitly; `sop reconcile … --accept-changed RUST-007E` recorded
+  it. No criterion was weakened. The BLOCKED task was requeued with
+  `sop retry RUST-007E`.
+
+### 36.2 First run — no-progress block, no repeated attempt
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` with the configured
+  Ollama provider ran RUST-007E for 3 minutes: 17 iterations, 11 discovery
+  inspections, **0 repository mutations**, `IMPLEMENT_NO_PROGRESS`. The last
+  action was a rejected `write_file`.
+- SOP classified it `NO_PROGRESS` / `BLOCK` / `TERMINAL` and did not
+  auto-continue, because a retry under unchanged conditions would repeat.
+  `.agent-sdlc/runs/RUST-007E/` preserves that attempt.
+- The implementation was completed by the operator within the authorized scope;
+  SOP still owned the verdict. The run was not claimed as SOP-implemented.
+
+### 36.3 Implemented
+
+- Production ingest dispatch (`rust/src/pipeline.rs`, `rust/src/service.rs`,
+  `rust/src/bin/ingest.rs`): `.pdf` keeps the PDF loader and incomplete-page
+  gate; `.md`/`.markdown` use the shared section parser; `.txt` uses the
+  plain-text loader; unknown extensions are rejected before any effect. Both
+  page-less paths run `gate_sections` and converge on the existing fingerprint,
+  embedding, and transactional replacement path.
+- K=3 parity: added `rust/acceptance/k3_parity` and the Go `tools/rankdump`
+  reference helper. The ranking comparison exposed a real divergence — Rust
+  evaluation printed every chunk, while Go deduplicates sections after fusion.
+  Added `retrieval::dedup::dedup_sections` and used it in
+  `evaluation::evaluate_sql`, matching the Go pipeline.
+- Markdown/plain-text acceptance: `rust/acceptance/ingest_md_text` proves
+  provenance, ordering, unchanged duplicates, empty/missing/unknown rejection,
+  embedding failure isolation, and dimension-failure rollback.
+- Live RAG: `rust/acceptance/live_rag` drives the production `ingest`/`query`
+  binaries against real Ollama (`nomic-embed-text`, `llama3.2:3b`) and
+  PostgreSQL/pgvector, validates every citation against stored rows, and proves
+  the empty-corpus refusal. Evidence is recorded in
+  `docs/reports/rust-migration/RUST-007E-live-evidence.md`.
+- Added Makefile targets and command-reference entries for the three acceptance
+  crates; the live target is explicit and not part of the ordinary edit loop.
+
+### 36.4 Verify-first run — VERIFIED
+
+- `sop run docs/plans/PLAN-RUST-MIGRATION.md --max-tasks 1` (verify-first) →
+  RUST-007E `PASSED`; `sop verify RUST-007E` → `VERIFIED`,
+  `validation: passed`, `lifecycle: LOCAL_DONE`.
+- All five criteria are `Met`:
+  K=3 parity (`k3_parity`), Markdown/plain-text ingestion (`ingest_md_text`),
+  transactional safety and provenance (`ingest_md_text`), live Ollama/PostgreSQL
+  RAG (`live_rag`), and the existing Go/reference plus transition checks.
+- All nine acceptance checks passed, including `go build/test/vet`, the Rust
+  suite, `eval_evidence`, and the clean-checkout-with-Go crate. The eight
+  configured validation commands also passed.
+- Run metrics: 0 agent calls (verified first), 1 validation run, 0 fix cycles,
+  3m 52s.
+
+### 36.5 Results
+
+- **K=3 parity:** per-case ranking order, tie ordering, K=3 recall/precision,
+  rejection labels, and aggregate metrics match the pinned Go reference. K=4
+  output was not substituted.
+- **Markdown/plain text:** both formats ingest through the production binary;
+  rows keep source, language, chunk order, `page = NULL`, corpus, and hash;
+  duplicates are no-ops; rejected/failed cases leave prior rows intact.
+- **Live RAG:** Markdown, PDF (page 2), and plain-text citations validated
+  against stored rows; the empty corpus returned the baseline refusal with no
+  citations.
+- **Existing checks:** Go reference and RUST-007B transition/clean-checkout
+  checks remain green. Go is still present and operational.
+
+### 36.6 State and next milestone
+
+- `sop status`: RUST-007E `LOCAL_DONE`; RUST-008A `PLANNED`; RUST-007C
+  `PLANNED`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval reset, merge, or auto-merge.
+  RUST-008A and RUST-007C were not started.
+- Next executable milestone: `RUST-008A` (browser integration), then RUST-007C
+  (Rust-only transition).
+
+## 37. RUST-008A browser integration — verified
+
+Date: 2026-10-19. This section supersedes §36.6: RUST-008A is now verified and
+RUST-007C is the next milestone. Go remains present.
+
+### 37.1 Preflight and scope
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085`; no SOP process was
+  active. RUST-007E was `LOCAL_DONE`/`VERIFIED` and RUST-008A was `PLANNED` with
+  its dependency satisfied.
+- Branch: `rust-008a-browser-integration`, based on the verified RUST-007E
+  commit `60fbad2`. No uncommitted work was discarded.
+- The implementation stayed within RUST-008A: no Go removal, no crate move, no
+  RUST-007C or RUST-008 execution.
+
+### 37.2 Shared services and API
+
+- Extracted `rust/src/query_service.rs` so `bin/query` and the Axum API use the
+  same retrieval, generation, and citation-validation path. `Answer` now carries
+  the cited `ContextPassage` list for structured API sources; the CLI output is
+  unchanged.
+- Added `rust/src/api.rs` and `rust/src/bin/api.rs`: `GET /api/health`,
+  `POST /api/documents/ingest`, `GET /api/documents/{source}/status`, and
+  `POST /api/query`. Ingestion calls `IngestService`; query calls `QueryService`.
+  Synchronous database/Ollama work runs on `spawn_blocking`.
+- Upload validation covers extension, 10 MiB size, empty files, missing names,
+  unexpected fields, and one file per request. Incomplete PDFs return `422` with
+  `incomplete_pages` and write nothing.
+- Added `PgStore::source_status` for ordered chunk/section/page provenance.
+- The API binds `127.0.0.1:8080` by default; `API_URL`, the database DSN, and
+  model credentials stay server-side.
+
+### 37.3 Next.js and browser E2E
+
+- Replaced the mock-only `web/` page with real same-origin `/api/*` calls through
+  the existing Next.js server-side rewrite. Removed the mock module and banner;
+  the UI now shows real health, ingestion status, cited answers, page references,
+  and the loading, empty, connection-failure, extraction-error, and
+  insufficient-evidence states.
+- Added `web/e2e/rag.spec.ts`, `web/playwright.config.ts`, the Playwright dev
+  dependency, and `scripts/web-e2e.sh`. The runner starts Axum + Next.js with a
+  unique corpus and deletes only that corpus.
+- `make web-e2e` → **5 passed** (1.2m, then 18s on a warm model). The real browser
+  verified Markdown upload → cited answer, PDF upload → `Page 2 - p.2`, loading,
+  connection failure, incomplete-PDF extraction, and insufficient evidence. Every
+  `/api/*` request was same-origin `127.0.0.1:3000`; no request reached the Axum
+  port. Screenshots are under
+  `docs/reports/rust-migration/web-e2e/`; the summary is
+  `docs/reference/rust-008a-browser-evidence.md`.
+
+### 37.4 Deterministic verification
+
+- `cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml`
+  → **PASS** (1 test): health, validation, incomplete-PDF no-write, Markdown/PDF/
+  plain-text status, duplicate no-op, cited query whose sources resolve, empty
+  question, and empty-corpus refusal. The test starts the real API binary with a
+  deterministic Ollama server and the dedicated database.
+- `sop validate --cache` → all eight Go/Rust build/test/lint commands **PASS**.
+- Re-ran the affected acceptance crates: `k3_parity`, `ingest_md_text`,
+  `live_rag`, `eval_parity`, `evidence`, and `clean_checkout_go` → all pass.
+- `make web-typecheck` and `make web-build` → pass. Go build/test/vet remain
+  green.
+
+### 37.5 SOP verdict and operator acceptance
+
+- Verify-first `sop run … --max-tasks 1` → `PASSED`; outcome `PARTIAL` with
+  `NEEDS_HUMAN` because criteria 2 and 3 are manual browser evidence. The run did
+  not fabricate acceptance.
+- The operator recorded the evidence-bound acceptance decisions with
+  `sop outcome RUST-008A --accept criterion-2 … --by operator` and the same for
+  `criterion-3`, then approved the human gate with `sop approve RUST-008A`.
+- A resumed verify-first run → `PASS`; `sop verify RUST-008A` → **`VERIFIED`**,
+  validation passed, **`LOCAL_DONE`**. All five criteria are met. The run used
+  0 agent calls and 1 validation run.
+
+### 37.6 Intentional contract differences
+
+- Incomplete PDFs return `422` with `incomplete_pages` and write nothing (the
+  UI-001 draft proposed `200` with readable chunks); the verified pipeline
+  rejects them pre-effect.
+- Added `GET /api/documents/{source}/status`.
+- `top_k` is accepted and validated but the server's `TOP_K`/`FINAL_K` govern
+  retrieval, matching the CLI.
+
+### 37.7 State and next milestone
+
+- `sop status`: RUST-008A `LOCAL_DONE`; RUST-007C `PLANNED`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval-history edit, merge, or auto-merge.
+- Next executable milestone: **RUST-007C** (Rust-only transition and final
+  verification). It was not started; Go remains present.
+
+## 38. RUST-007C Rust-only transition — verified
+
+Date: 2026-10-19. This section supersedes §37.7: RUST-007C is verified, the Go
+implementation is gone, and RUST-008 is the only remaining plan task.
+
+### 38.1 Preflight
+
+- Installed SOP: `7540edc9bc2b3bb5a9c6cfe4f3799021b807e085`; no SOP process was
+  active. RUST-007B, RUST-007E, and RUST-008A were `LOCAL_DONE`/`VERIFIED`;
+  RUST-007C was `PLANNED` with all dependencies satisfied.
+- Branch: `rust-007c-rust-only`, based on the verified RUST-008A commit
+  `7c3c3e1623622f546f0a886ac5078ecbbeb600b8`.
+
+### 38.2 Final layout and Go removal
+
+- Moved the Cargo package to the repository root: `Cargo.toml`, `Cargo.lock`,
+  `rust-toolchain.toml`, `src/`, `tests/`, `fixtures/`, and `acceptance/`.
+  Updated acceptance `repo_root()` calculations, binary paths, fixture paths,
+  and test working directories.
+- Removed `cmd/`, `internal/`, `go.mod`, `go.sum`, `tools/` (including the Go
+  fixture generator, interop helper, and K=3 rank dump), the Go sweep scripts,
+  the Go interop test directions, and `acceptance/clean_checkout_go`.
+- The Rust package provides every command (`ingest`, `query`, `eval`,
+  `expbilingual`, `api`), the shared services, the Axum API, and the Next.js UI.
+- No `.go` file remains. `migrations/`, `evals/`, `examples/`,
+  `docker-compose.yml`, `fixtures/`, and the historical evidence under
+  `docs/reports/rust-migration/` are preserved.
+
+### 38.3 Frozen Go reference outputs
+
+- Before removing Go, captured the pinned reference outputs into
+  `fixtures/parity/frozen/`: K=3 and K=4 `cmd/eval` stdout, the K=3 ranking dump,
+  the bilingual `ARM=all` and `ARM=B,C,E` stdout, and both query caches.
+- Rewrote `acceptance/eval_parity`, `acceptance/k3_parity`, and
+  `acceptance/bilingual_parity` to ingest with the production Rust `ingest` and
+  compare the Rust commands against those frozen outputs. No expected value is
+  generated from Rust. The bilingual footer normalizes the dynamic `wall=` and
+  `cache=` tokens.
+- Added `acceptance/final_layout` (root layout, no Go files/tooling, preserved
+  provenance/assets, Rust-only Makefile/hooks/CI) and
+  `acceptance/clean_checkout` (copy the tree, remove Go from `PATH`, run
+  `cargo build --locked`, `cargo test --lib`, and the section/chunk parity test).
+
+### 38.4 Tooling and documentation
+
+- Makefile is Rust-only: `cargo build/test/fmt/clippy`, the acceptance targets,
+  `web-*`, and the explicit `web-e2e` target. The Go `integration`/`sweep`
+  targets and scripts are gone.
+- Hooks run Rust fmt, evidence, final-layout, web typecheck, build/test/clippy,
+  clean checkout, and the web build; no Go commands.
+- CI has `rust` (pgvector service, fmt/build/test/clippy, final layout/clean
+  checkout), `api-contract`, and `web` jobs; the Go job is gone.
+- Updated README, command reference, usage, architecture, project structure,
+  capability/configuration/testing references, platform support, editor
+  verification, and the transition evidence for the root Rust-only layout.
+
+### 38.5 SOP verification and command-policy repair
+
+- Two verify-first attempts stopped at setup blockers because the installed
+  command policy rejected `cargo clippy … -- -D warnings` and
+  `cargo fmt --manifest-path Cargo.toml --check` on the acceptance path. The
+  acceptance checks were changed to the authorizable root forms
+  `cargo clippy --locked --all-targets` and `cargo fmt --check`. The configured
+  validation still runs Clippy with `-D warnings` and the fmt check, so no
+  criterion was weakened.
+- The verify-first run then passed: `sop verify RUST-007C` → **`VERIFIED`**,
+  validation passed, **`LOCAL_DONE`**; all six criteria met; 0 agent calls, one
+  validation run, 0 fix cycles.
+
+### 38.6 Verification results
+
+- Root: `cargo fmt --check`, `cargo build --locked`, `cargo test --locked`
+  (216 library tests plus integration/doc tests), and
+  `cargo clippy --locked --all-targets -- -D warnings` all pass.
+- Acceptance: `final_layout` (5), `clean_checkout` (1), `evidence` (5),
+  `api_contract` (1), `k3_parity` (1), `eval_parity` (1), `ingest_md_text` (1),
+  `bilingual_parity` (1), `e2e` (2), `live_rag` (2), `ingest_cli` (2), and
+  `retrieval_cli` (9) pass. The live checks use real Ollama and PostgreSQL.
+- Web: `make web-typecheck`, `make web-build`, and `make web-e2e` pass (5
+  browser tests). The Axum API and CLI binaries build from the root package.
+
+### 38.7 State and next milestone
+
+- `sop status`: RUST-007C `LOCAL_DONE`; RUST-008 `PLANNED`.
+- No `state.db` edit, budget reset, approval-history edit, merge, or auto-merge.
+- Next executable milestone: **RUST-008** (final Rust-only browser acceptance).
+  RUST-007C is complete; Go no longer exists in the repository.

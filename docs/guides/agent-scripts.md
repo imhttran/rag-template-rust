@@ -2,36 +2,25 @@
 
 ## Git hooks
 
-`.githooks/pre-commit` runs `go mod tidy`, `go fmt ./...`, `go vet ./...`,
-`staticcheck ./...`, `go test ./...`, and `go build ./...`, and aborts the commit
-if any step fails. It also aborts when `go mod tidy` or `go fmt` changed a file
-that is part of the commit, so the fix can be staged before committing again.
-When `govulncheck` is on `PATH` it also runs `govulncheck ./...` (skipped with an
-install hint otherwise).
+`.githooks/pre-commit` loads `.env` when present, validates every tracked JSON
+file with `jq`, then runs the Rust and web checks through the Makefile:
 
-It also runs `jq empty` over every tracked `*.json`, so a malformed
-`evals/retrieval.json` or `.zed/settings.json` fails the commit instead of the
-command that reads it. `jq` is skipped with a note if it is not on `PATH`.
-`make fmt-json` is the reformatting counterpart, for when you want jq's layout
-rather than just a syntax check.
+- `make rust-fmt` (`cargo fmt --check`)
+- `make rust-acceptance-evidence`
+- `make rust-acceptance-final-layout`
+- `make web-check-env`
+- `make web-typecheck` (`tsc --noEmit`)
 
-`staticcheck` must be on `PATH` (`brew install staticcheck` on macOS). It catches
-unused code — functions, methods, and types — which `go vet` does not.
+`.githooks/pre-push` runs the full gates:
 
-`.githooks/pre-push` runs what the pre-commit hook skips, using one
-project-agnostic script in `.agents/scripts/`. The hook supplies only what is
-specific to this project.
+- `make rust-build rust-test rust-clippy`
+- `make transition-evidence` (evidence, final layout, and the clean checkout
+  with Go absent from `PATH`)
+- `make web-check-env`
+- `make web-build` (the Next.js production build)
 
-`.agents/scripts/integration-test-agent.sh` runs the database tests
-(`internal/retrieval`, `internal/ingestion`) given by `INTEGRATION_TEST_CMD`. It
-probes `INTEGRATION_TEST_DB` with `psql` first — this project points that at
-`RAG_TEST_DATABASE_URL` (a throwaway database, `rag_test` by default), because the
-tests truncate the `documents` table and must never touch `DATABASE_URL`. An
-unreachable database is skipped with a note, so a stopped Docker daemon never
-blocks a push; `INTEGRATION_TEST_STRICT` (`RAG_REQUIRE_INTEGRATION=1`) fails
-instead. It also fails when the command passes but no test ran, so a `-run` filter
-that matches nothing cannot turn the gate green.
-
+The Makefile targets are the single source of truth; the hooks do not duplicate
+the commands.
 `.agents/scripts/review-agent.sh` reviews the diff against `origin/main` and is
 advisory — a finding never fails anything. It is not wired into the hook either,
 so run it by hand when you want a second pair of eyes: it is read-only
@@ -63,7 +52,6 @@ manual run) at them:
 
 ```sh
 AUDIT_AGENT=/path/to/shared/audit-agent.sh
-INTEGRATION_TEST_AGENT=/path/to/shared/integration-test-agent.sh
 REVIEW_AGENT=/path/to/shared/review-agent.sh
 ```
 
@@ -94,14 +82,13 @@ command above. Verify with `git config --get core.hooksPath` (expect `.githooks`
 
 ## Rust and web checks
 
-While Go remains in the repository, both hooks also gate the Rust port and the
-Next.js prototype, reusing the Makefile targets so the commands never drift:
+Both hooks delegate to the Makefile so the commands never drift:
 
-- `pre-commit` adds `make rust-fmt` (`cargo fmt --check`) and `make web-typecheck`
-  (`tsc --noEmit`).
-- `pre-push` adds `make rust-build rust-test rust-clippy` (`cargo build --locked`,
-  `cargo test --locked`, and `cargo clippy --locked --all-targets -- -D warnings`)
-  and `make web-build` (the Next.js production build).
+- `pre-commit` runs `make rust-fmt`, `make rust-acceptance-evidence`,
+  `make rust-acceptance-final-layout`, `make web-check-env`, and
+  `make web-typecheck`.
+- `pre-push` runs `make rust-build rust-test rust-clippy`,
+  `make transition-evidence` (including the clean checkout without Go), and
+  `make web-build`.
 
-The Rust package still lives at `rust/`; the targets use that path until RUST-007
-moves it to the repository root.
+The Cargo package is at the repository root; no separate `rust/` path is used.

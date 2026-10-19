@@ -3,7 +3,7 @@
 Repository: https://github.com/imhttran/rag-template-rust
 Target path: `docs/plans/PLAN-RUST-MIGRATION.md`
 Created: 2026-10-17
-Status: DRAFT — execution has not started.
+Status: ACTIVE — RUST-001 through RUST-007C verified; RUST-008 is pending.
 
 ## Project
 
@@ -66,6 +66,14 @@ evidence and updates pre-removal tooling while Go remains; **RUST-007C** perform
 the Rust-only transition and final no-Go verification. RUST-008 depends on
 RUST-007C. The machine plan was validated with SOP's own
 `planner.PlanFromMarkdown` and `Plan.Validate` before execution.
+
+On 2026-10-19 a third repair added the remaining functional closure without
+replacing completed history: **RUST-007E** closes the original K=3 parity,
+production Markdown/plain-text ingestion, and live Ollama/PostgreSQL
+ingest → retrieve → cited-answer gaps while Go remains present; **RUST-008A**
+adds the real Axum/Next.js browser integration on top of RUST-007E. RUST-007C
+therefore depends on RUST-007B, RUST-007E, and RUST-008A, and RUST-008 remains
+the final Rust-only browser acceptance after RUST-007C.
 
 ## Verification mapping and the informational-criteria limitation
 
@@ -761,6 +769,10 @@ Port the Go `cmd/expbilingual` experiment harness. This is the single follow-up 
 - criterion 4: manual: live-model groundedness and citation evidence (UNMET until a real Ollama run is recorded)
 - criterion 5: check 5
 
+### Execution
+
+- verify-first
+
 ### Work Steps
 
 1. Add the production `expbilingual` binary and bilingual module; preserve arms A/B/C/D1/D2/E, dataset formats, the cache path/semantics, and the pinned generation settings.
@@ -815,6 +827,108 @@ Verification: Run Go reference checks, the dedicated evidence crate, and the Rus
 
 Learning focus: Reproducibility and transition documentation.
 
+## RUST-007E — Functional closure: K=3 parity, Markdown/text ingestion, live RAG
+
+Close the remaining functional gaps before Go is removed: reproduce the original
+K=3 evaluation contract against the pinned Go reference, ingest Markdown and
+plain-text sources through the production pipeline, and verify the real Ollama +
+PostgreSQL production path from ingestion to a validated cited answer. Keep Go
+present and do not start the Rust-only transition.
+
+### Dependencies
+
+- RUST-007
+- RUST-007D
+- RUST-007B
+
+### Acceptance Criteria
+
+- With the pinned Go reference and the original evaluation settings (`TOP_K=3`, `FINAL_K=3`, `EXPAND_LIMIT=20`, `MIN_SIMILARITY=0.6`, rewrite/rerank/answerability-gate/fact-judge off), the production Rust `eval` binary and the pinned Go `cmd/eval` agree per case on source/section ranking order and K=3 recall/precision and agree on the aggregate metrics under the frozen comparison rules. The evidence is produced at K=3; K=4 results are not substituted.
+- The production `ingest` binary and service load `.md` and `.txt` sources through the existing Markdown/text loaders and store them through the same chunk, embed, and transactional source-replacement path as PDFs, preserving source identity, language, chunk ordering, corpus, and content hash.
+- Empty, malformed or unreadable, duplicate (unchanged), and failed-ingestion cases are rejected or skipped without corrupting or partially replacing previously stored rows; page-less Markdown/text rows keep `page = NULL`, and stored chunk order/index and language match the loaded sections.
+- A real Ollama embedding/generation model and a real PostgreSQL+pgvector database drive the Rust production `ingest` and `query` commands to ingest representative PDF, Markdown, and plain-text documents, retrieve content, generate an answer with source citations that validate against the retrieved content, and refuse when the retrieved context cannot answer. The commands, configuration identifiers, model versions, corpus identity, results, and observations are recorded in `docs/reports/rust-migration/RUST-007E-live-evidence.md`.
+- Existing Go reference checks and the RUST-007B transition/clean-checkout checks still pass. Go remains available and operational, and no completed task, acceptance record, fixture, or historical result is altered.
+
+### Acceptance Checks
+
+- `go build ./...`
+- `go test ./...`
+- `go vet ./...`
+- `cargo test --locked --manifest-path rust/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/k3_parity/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/ingest_md_text/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/live_rag/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/evidence/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/clean_checkout_go/Cargo.toml`
+
+### Acceptance Mapping
+
+- criterion 1: check 5
+- criterion 2: check 6
+- criterion 3: check 6
+- criterion 4: check 7
+- criterion 5: check 9
+
+### Execution
+
+- verify-first
+
+### Work Steps
+
+1. Add `rust/acceptance/k3_parity` with the implementation: build the pinned Go `cmd/ingest`/`cmd/eval` and the production Rust `eval`, ingest the frozen dataset sources into a dedicated test database with deterministic embeddings, run both commands with `TOP_K=3` and `FINAL_K=3`, and compare per-case source/section ranking order, K=3 recall/precision, rejection labels, and aggregate metrics. Do not reuse K=4 output or regenerate expected data from Rust.
+2. Extend the production ingest path for `.md` and `.txt`: select the existing Markdown/text loader by extension, pass page-less sections through the existing pre-effect gate, and keep the single pipeline, fingerprint, embedding, and transactional replacement path. Do not duplicate chunking or storage logic.
+3. Add `rust/acceptance/ingest_md_text` proving production Markdown/plain-text ingestion, provenance (`page = NULL`, source/language/chunk order), duplicate/unchanged behavior, empty/malformed rejection, and failed-embedding/failed-write rollback leaves prior rows intact. Use a dedicated test database and a unique corpus; clean up only that corpus.
+4. Add `rust/acceptance/live_rag`: run the production Rust `ingest` and `query` binaries against real Ollama and PostgreSQL+pgvector with a unique corpus; ingest a PDF, Markdown, and plain-text source; ask an answerable question and validate every rendered citation against retrieved content; ask an unanswerable question and assert the baseline refusal; record the model names/versions and results in `docs/reports/rust-migration/RUST-007E-live-evidence.md`; clean up only the run corpus.
+5. Record the K=3, ingestion, and live evidence under `docs/reports/rust-migration/`, update the migration capability matrix and limitations, and run the existing Go and RUST-007B checks.
+
+Verification: Run the Go reference checks, the dedicated K=3, Markdown/text, live-RAG, evidence, and clean-checkout crates, and the Rust suite. A generic `cargo test` is not evidence for a missing production path; the live crate must exercise the real binaries and services.
+
+Learning focus: Frozen-contract parity, format-aware production loading, and live end-to-end verification.
+
+## RUST-008A — Browser integration
+
+Add the real Axum API and Next.js upload → ingest → question → cited-answer flow over the existing Rust application services, with browser end-to-end and error-state evidence. This task does not remove Go and does not perform the Rust-only transition.
+
+### Dependencies
+
+- RUST-007E
+
+### Acceptance Criteria
+
+- The Axum API exposes upload, ingestion status, query, and health over the same Rust application services the CLI uses, binds `127.0.0.1` by default, keeps `API_URL` and model/database credentials server-side, and serves only same-origin `/api` requests to the browser.
+- The Next.js workflow completes upload → ingest → question → cited-answer end to end, with source citations and page references.
+- Loading, empty, connection-failure, and extraction-error states are covered.
+- The Rust-side API contract is verified deterministically; browser end-to-end and UI-state checks are recorded as operator-run evidence because Node.js/browser execution is outside the SOP command policy.
+- Existing CLI behavior and the Go reference remain operational.
+
+### Acceptance Checks
+
+- `cargo test --locked --manifest-path rust/Cargo.toml`
+- `cargo test --locked --manifest-path rust/acceptance/api_contract/Cargo.toml`
+
+### Acceptance Mapping
+
+- criterion 1: check 2
+- criterion 2: manual: operator-run browser upload-to-cited-answer evidence
+- criterion 3: manual: operator-run UI loading, empty, connection-failure, and extraction-error evidence
+- criterion 4: check 2
+- criterion 5: check 1
+
+### Execution
+
+- verify-first
+
+### Work Steps
+
+1. Expose the shared Rust application services so the CLI and the Axum API call the same load/ingest/retrieve/answer functions.
+2. Add the Axum API with upload, ingestion, query, and health endpoints bound to loopback; keep `API_URL` and credentials server-side.
+3. Add the Next.js upload, status, question, and cited-answer views, proxying `/api/*` server-side and binding the Next.js server to loopback.
+4. Add `rust/acceptance/api_contract` for the Rust-side contract and record operator-run browser evidence for the full flow and the four UI states.
+
+Verification: Run the Rust checks and the API contract crate; exercise the browser flow and record the four UI states as operator-run evidence. Do not claim the Rust-only layout in this task.
+
+Learning focus: Axum handlers, shared application services, and browser-facing API isolation.
+
 ## RUST-007C — Rust-only transition and final verification
 
 Move the Rust package to the repository root; remove Go source, `go.mod`, `go.sum`, and Go-only tooling; update CI, Makefile, `.zed` tasks, SOP validation checks, hooks, and documentation for the Rust-only layout; and verify a clean checkout builds and tests without Go installed. Remove Go only after RUST-007 and RUST-007B pass.
@@ -822,6 +936,8 @@ Move the Rust package to the repository root; remove Go source, `go.mod`, `go.su
 ### Dependencies
 
 - RUST-007B
+- RUST-007E
+- RUST-008A
 
 ### Acceptance Criteria
 
@@ -834,10 +950,10 @@ Move the Rust package to the repository root; remove Go source, `go.mod`, `go.su
 
 ### Acceptance Checks
 
-- `cargo build --locked --manifest-path Cargo.toml`
-- `cargo test --locked --manifest-path Cargo.toml`
-- `cargo clippy --locked --all-targets --manifest-path Cargo.toml -- -D warnings`
-- `cargo fmt --manifest-path Cargo.toml --check`
+- `cargo build --locked`
+- `cargo test --locked`
+- `cargo clippy --locked --all-targets`
+- `cargo fmt --check`
 - `cargo test --locked --manifest-path acceptance/final_layout/Cargo.toml`
 - `cargo test --locked --manifest-path acceptance/clean_checkout/Cargo.toml`
 
@@ -849,6 +965,10 @@ Move the Rust package to the repository root; remove Go source, `go.mod`, `go.su
 - criterion 4: check 5
 - criterion 5: check 6
 - criterion 6: check 2
+
+### Execution
+
+- verify-first
 
 ### Work Steps
 

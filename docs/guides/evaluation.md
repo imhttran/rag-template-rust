@@ -7,11 +7,11 @@ each with the `source`/`section` documents that should be retrieved. Ingest the
 example corpora first, then run it:
 
 ```bash
-go run ./cmd/ingest examples/loan-policy.md
-go run ./cmd/ingest examples/large-loan-policy.md
-go run ./cmd/ingest examples/member-services-guide.md
-go run ./cmd/ingest examples/commercial-servicing-manual.md
-go run ./cmd/eval
+cargo run --locked --bin ingest examples/loan-policy.md
+cargo run --locked --bin ingest examples/large-loan-policy.md
+cargo run --locked --bin ingest examples/member-services-guide.md
+cargo run --locked --bin ingest examples/commercial-servicing-manual.md
+cargo run --locked --bin eval
 ```
 
 For each case it reports recall and precision at K = 1, 2, `TOP_K` for plain
