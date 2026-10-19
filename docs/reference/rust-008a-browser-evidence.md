@@ -112,3 +112,8 @@ through SOP.
 - `make transition-evidence` — RUST-007B transition/clean-checkout checks
 
 Go remains present and operational; RUST-007C was not started.
+
+> Historical note: RUST-007C later completed the Rust-only transition (the Go
+tree and Go tooling were removed and the Rust package moved to the repository
+root), and RUST-008 recorded the final `VERIFIED / LOCAL_DONE` acceptance. See
+`docs/reports/rust-migration/RUST-008-final-acceptance.md`.

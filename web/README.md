@@ -78,6 +78,16 @@ uses a unique corpus, and deletes only that corpus afterwards. Evidence and
 screenshots are recorded under `docs/reports/rust-migration/web-e2e/` and
 summarized in `docs/reference/rust-008a-browser-evidence.md`.
 
+## UI state mapping
+
+| Axum error / condition | UI state |
+| --- | --- |
+| loading request in flight | loading |
+| no documents ingested | empty |
+| `/api/health` unreachable (`dependency_unavailable`) | connection-failure |
+| `incomplete_pdf`, `no_sections`, `extraction_failed` | extraction-error |
+| `insufficient: true` in `/api/query` | insufficient-evidence |
+
 ## API contract
 
 The browser-facing contract is in
