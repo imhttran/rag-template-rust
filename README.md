@@ -9,7 +9,8 @@ commands score retrieval quality and run a bilingual evaluation harness.
 Four CLI commands drive it — `ingest` loads a document (PDF, Markdown, or plain
 text), `query` answers a question with cited evidence, `eval` scores retrieval,
 and `expbilingual` runs the RAG-024 bilingual evaluation arms. The Axum `api`
-binary serves the Next.js browser UI. The full list, including the `make`
+binary serves the Next.js browser UI, and `retrieval` serves Agentic SOP's
+`rag-retrieval/v1` contract over stdin/stdout. The full list, including the `make`
 shortcuts, is in the [command reference](docs/reference/commands.md).
 
 ## Architecture
@@ -86,6 +87,7 @@ setup details, see the [usage guide](docs/guides/usage.md).
 | `cargo run --locked --bin eval` | Score retrieval against `evals/retrieval.json` | `make eval` |
 | `cargo run --locked --bin expbilingual` | Run the RAG-024 bilingual evaluation arms over a frozen split | — (run directly) |
 | `cargo run --locked --bin api` | Serve the Axum API for the Next.js UI on `127.0.0.1:8080` | — (run directly) |
+| `cargo run --locked --bin retrieval < request.json` | Agentic SOP `rag-retrieval/v1` producer: JSON request on stdin, ranked cited evidence on stdout ([details](docs/reference/commands.md#sop-retrieval-producer)) | — (run directly) |
 
 Supporting `make` targets: `db-up`, `db-down`, `db-schema`, `test`, `fmt-json`,
 and the Rust/web checks. See the [command reference](docs/reference/commands.md)

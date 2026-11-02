@@ -18,6 +18,15 @@ use crate::storage_pg::{SqlHit, StoredChunkRow};
 /// ascending, matching the Go `FuseRankings` contract. At most `top_k` results
 /// are returned.
 pub fn fuse(rankings: &[Vec<SqlHit>], top_k: usize) -> Vec<Candidate> {
+    fuse_hits(rankings, top_k)
+        .into_iter()
+        .map(|(hit, score)| Candidate::new(chunk(&hit.row), score))
+        .collect()
+}
+
+/// [`fuse`] that keeps each fused [`SqlHit`] (row id, content hash, corpus)
+/// alongside its RRF score, for callers that report stored provenance.
+pub fn fuse_hits(rankings: &[Vec<SqlHit>], top_k: usize) -> Vec<(SqlHit, f64)> {
     struct Entry {
         hit: SqlHit,
         score: f64,
@@ -57,7 +66,7 @@ pub fn fuse(rankings: &[Vec<SqlHit>], top_k: usize) -> Vec<Candidate> {
     fused.truncate(top_k.min(fused.len()));
     fused
         .into_iter()
-        .map(|entry| Candidate::new(chunk(&entry.hit.row), entry.score))
+        .map(|entry| (entry.hit, entry.score))
         .collect()
 }
 
