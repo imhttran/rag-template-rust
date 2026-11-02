@@ -73,6 +73,7 @@ fn rust_package_sits_at_the_repository_root() {
         "src/bin/query.rs",
         "src/bin/eval.rs",
         "src/bin/expbilingual.rs",
+        "src/bin/retrieval.rs",
         "tests",
         "acceptance",
         "fixtures",
@@ -89,7 +90,7 @@ fn rust_package_sits_at_the_repository_root() {
     }
 
     let manifest = read("Cargo.toml");
-    for binary in ["ingest", "query", "eval", "expbilingual", "api"] {
+    for binary in ["ingest", "query", "eval", "expbilingual", "api", "retrieval"] {
         assert!(
             manifest.contains(&format!("name = \"{binary}\"")),
             "Cargo.toml must declare the {binary} binary"

@@ -12,8 +12,40 @@ wrappers over the library modules, and the Axum API calls the same services.
 | `eval` | Score retrieval (recall/precision) against `evals/retrieval.json` |
 | `expbilingual` | Run the RAG-024 bilingual evaluation arms over a frozen split |
 | `api` | Serve the Axum API for the Next.js UI on `127.0.0.1:8080` |
+| `retrieval` | Agentic SOP `rag-retrieval/v1` producer: one JSON request on stdin → ranked, cited evidence as one JSON response on stdout |
 
 Run them with `cargo run --locked --bin <name>` or use the Makefile shortcuts.
+
+## SOP retrieval producer
+
+`retrieval` takes no arguments. It reads one request (at most 1 MiB) from stdin
+and writes exactly one JSON line to stdout; diagnostics go to stderr, and it
+exits 0 even on failure, reporting the failure in the response.
+
+```json
+{"schema_version":"rag-retrieval/v1","query":"late fees","top_k":5,
+ "filters":{"corpus":"kb"},"deadline_ms":30000}
+```
+
+- Only corpora listed in `RAG_RETRIEVAL_ALLOWED_CORPORA` (comma-separated) are
+  served. Any other corpus, or none, answers `UNAUTHORIZED_SCOPE` before the
+  database or Ollama is touched.
+- `top_k` outside 1–50 becomes 5; `deadline_ms` ≤ 0 becomes 30 s and bounds the
+  connect, embed, and search calls.
+- Optional filters `source_prefix`, `language`, `ingested_from`, and
+  `ingested_to` (RFC 3339) narrow the search in SQL. A malformed timestamp is
+  `MALFORMED`.
+- `status` is `OK` or `EMPTY` on success, otherwise `MALFORMED`, `OVERSIZE`,
+  `UNSUPPORTED_SCHEMA`, `UNAUTHORIZED_SCOPE`, `UNAVAILABLE` (database or Ollama
+  unreachable), `TIMEOUT`, or `INTERNAL`, mirrored in `diagnostics.error_code`.
+- Each `evidence` item carries `id`, `corpus`, `source` (the path stored by
+  `ingest`, so set `RAG_SOURCE` to a repo-relative path), `document_hash`,
+  `section`, `page`, `text`, `retrieval_method` (`hybrid`), `score`, and `rank`.
+
+It reads `DATABASE_URL`, `OLLAMA_URL`, `OLLAMA_EMBED_MODEL`, `EMBED_DIM`, and
+`EMBED_PROVIDER` with the same defaults as the other commands, and returns what
+`ingest` wrote with the same `RAG_CORPUS`. Build both for a consumer with
+`cargo build --locked --release --bin ingest --bin retrieval`.
 
 ## Shortcuts
 

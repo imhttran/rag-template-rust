@@ -162,6 +162,49 @@ pub struct SectionKey {
     pub section: String,
 }
 
+/// Optional metadata filter for the search reads, matching the Go
+/// `retrieval.Filter` minus the corpus (every read is already corpus-scoped).
+/// `None` applies no restriction, so the default filter leaves a search
+/// unfiltered.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SearchFilter {
+    /// Matches rows whose `source` starts with this literal prefix.
+    pub source_prefix: Option<String>,
+    /// Matches rows whose stored `language` equals this value.
+    pub language: Option<String>,
+    /// RFC 3339 instant: matches rows with `ingested_at` at or after it.
+    pub ingested_from: Option<String>,
+    /// RFC 3339 instant: matches rows with `ingested_at` at or before it.
+    pub ingested_to: Option<String>,
+}
+
+impl SearchFilter {
+    /// The SQL predicate over four bound parameters starting at `$start`:
+    /// source LIKE pattern, language, ingested-from, ingested-to. A NULL
+    /// parameter disables its clause. Values are always bound, never spliced.
+    fn predicate(start: usize) -> String {
+        let (a, b, c, d) = (start, start + 1, start + 2, start + 3);
+        format!(
+            "(${a}::text IS NULL OR source LIKE ${a}::text) \
+             AND (${b}::text IS NULL OR language = ${b}::text) \
+             AND (${c}::text IS NULL OR ingested_at >= ${c}::text::timestamptz) \
+             AND (${d}::text IS NULL OR ingested_at <= ${d}::text::timestamptz)"
+        )
+    }
+
+    /// The LIKE pattern for `source_prefix`, with `\`, `%`, and `_` escaped so
+    /// the prefix matches literally (Go `escapeLikePrefix`).
+    fn source_like(&self) -> Option<String> {
+        self.source_prefix.as_ref().map(|prefix| {
+            let escaped = prefix
+                .replace('\\', "\\\\")
+                .replace('%', "\\%")
+                .replace('_', "\\_");
+            format!("{escaped}%")
+        })
+    }
+}
+
 /// Returns the per-section row cap for a section read: `max(1, limit /
 /// key_count)`, matching the Go `SectionChunksFiltered` split. A zero
 /// `key_count` yields `max(1, limit)`.
@@ -290,17 +333,43 @@ impl PgStore {
         vector: &[f64],
         top_k: usize,
     ) -> Result<Vec<SqlHit>, PgStoreError> {
+        self.vector_search_filtered(corpus, vector, top_k, &SearchFilter::default())
+    }
+
+    /// [`PgStore::vector_search`] with an optional metadata [`SearchFilter`],
+    /// applied as a SQL pre-filter so `top_k` limits the filtered set (Go
+    /// `SearchFiltered`).
+    pub fn vector_search_filtered(
+        &self,
+        corpus: &str,
+        vector: &[f64],
+        top_k: usize,
+        filter: &SearchFilter,
+    ) -> Result<Vec<SqlHit>, PgStoreError> {
         let mut conn = self.connection()?;
         let literal = format_vector(vector);
+        let source_like = filter.source_like();
+        let sql = format!(
+            "SELECT id, content, source, section, chunk_index, language, page, corpus, \
+             content_hash, embed_model, embedding_dim, chunker_config, \
+             ingested_at::text, embedding::text, \
+             (1 - (embedding <=> $1::text::vector))::float8 AS similarity \
+             FROM documents WHERE corpus = $2 AND {} \
+             ORDER BY embedding <=> $1::text::vector LIMIT $3",
+            SearchFilter::predicate(4)
+        );
         let rows = conn
             .query(
-                "SELECT id, content, source, section, chunk_index, language, page, corpus, \
-                 content_hash, embed_model, embedding_dim, chunker_config, \
-                 ingested_at::text, embedding::text, \
-                 (1 - (embedding <=> $1::text::vector))::float8 AS similarity \
-                 FROM documents WHERE corpus = $2 \
-                 ORDER BY embedding <=> $1::text::vector LIMIT $3",
-                &[&literal, &corpus, &(top_k as i64)],
+                sql.as_str(),
+                &[
+                    &literal,
+                    &corpus,
+                    &(top_k as i64),
+                    &source_like,
+                    &filter.language,
+                    &filter.ingested_from,
+                    &filter.ingested_to,
+                ],
             )
             .map_err(|err| PgStoreError::Query(err.to_string()))?;
         rows.iter()
@@ -326,23 +395,50 @@ impl PgStore {
         top_k: usize,
         language: &str,
     ) -> Result<Vec<SqlHit>, PgStoreError> {
+        self.keyword_search_filtered(corpus, query, top_k, language, &SearchFilter::default())
+    }
+
+    /// [`PgStore::keyword_search`] with an optional metadata [`SearchFilter`],
+    /// applied as a SQL pre-filter (Go `KeywordSearchFiltered`).
+    pub fn keyword_search_filtered(
+        &self,
+        corpus: &str,
+        query: &str,
+        top_k: usize,
+        language: &str,
+        filter: &SearchFilter,
+    ) -> Result<Vec<SqlHit>, PgStoreError> {
         let mut conn = self.connection()?;
         let config = normalize_fts_config(language);
+        let source_like = filter.source_like();
+        let sql = format!(
+            "SELECT id, content, source, section, chunk_index, language, page, corpus, \
+             content_hash, embed_model, embedding_dim, chunker_config, \
+             ingested_at::text, embedding::text, \
+             ts_rank(\
+                 to_tsvector($3::text::regconfig, COALESCE(section, '') || ' ' || content),\
+                 websearch_to_tsquery($3::text::regconfig, $1)\
+             )::float8 AS rank \
+             FROM documents \
+             WHERE corpus = $4 AND {} AND to_tsvector(\
+                 $3::text::regconfig, COALESCE(section, '') || ' ' || content\
+             ) @@ websearch_to_tsquery($3::text::regconfig, $1) \
+             ORDER BY rank DESC LIMIT $2",
+            SearchFilter::predicate(5)
+        );
         let rows = conn
             .query(
-                "SELECT id, content, source, section, chunk_index, language, page, corpus, \
-                 content_hash, embed_model, embedding_dim, chunker_config, \
-                 ingested_at::text, embedding::text, \
-                 ts_rank(\
-                     to_tsvector($3::text::regconfig, COALESCE(section, '') || ' ' || content),\
-                     websearch_to_tsquery($3::text::regconfig, $1)\
-                 )::float8 AS rank \
-                 FROM documents \
-                 WHERE corpus = $4 AND to_tsvector(\
-                     $3::text::regconfig, COALESCE(section, '') || ' ' || content\
-                 ) @@ websearch_to_tsquery($3::text::regconfig, $1) \
-                 ORDER BY rank DESC LIMIT $2",
-                &[&query, &(top_k as i64), &config, &corpus],
+                sql.as_str(),
+                &[
+                    &query,
+                    &(top_k as i64),
+                    &config,
+                    &corpus,
+                    &source_like,
+                    &filter.language,
+                    &filter.ingested_from,
+                    &filter.ingested_to,
+                ],
             )
             .map_err(|err| PgStoreError::Query(err.to_string()))?;
         rows.iter()
