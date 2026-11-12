@@ -65,6 +65,9 @@ struct Evidence {
     corpus: String,
     source: String,
     document_hash: String,
+    /// `sha256:<hex>` of the exact UTF-8 bytes of `text`. SOP recomputes it and
+    /// rejects a mismatch (PROPOSAL-RAG-EVIDENCE-HASH.md, option A).
+    chunk_hash: String,
     section: String,
     page: i32,
     text: String,
@@ -249,15 +252,24 @@ fn retrieve(
             corpus: corpus.to_string(),
             source: hit.row.chunk.source.unwrap_or_default(),
             document_hash: hit.row.chunk.content_hash,
+            chunk_hash: chunk_hash(&hit.row.chunk.content),
             section: hit.row.chunk.section.unwrap_or_default(),
             page: hit.row.chunk.page.unwrap_or(0),
-            text: hit.row.chunk.content,
+            text: hit.row.chunk.content.clone(),
             retrieval_method: "hybrid",
             score,
             rank: index + 1,
         })
         .collect();
     Ok(evidence)
+}
+
+/// `sha256:<hex>` over the exact bytes of `text`, the value SOP recomputes.
+fn chunk_hash(text: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(text.as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    format!("sha256:{hex}")
 }
 
 /// Opens the store with every database wait bounded by `timeout`. One direct
@@ -368,6 +380,17 @@ fn is_rfc3339(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// Shared SHA-256 vector, also pinned in agentic-sop
+    /// (internal/ragclient/chunk_hash_test.go). Expected value computed with
+    /// `printf 'chunk hash vector: café 日本語\n' | shasum -a 256`.
+    #[test]
+    fn chunk_hash_matches_shared_vector() {
+        assert_eq!(
+            chunk_hash("chunk hash vector: café 日本語\n"),
+            "sha256:74f755664e399d5fec1e9e418c2d9dc684fe5abcab30c6fe2f9f60767bb620a8"
+        );
+    }
+
     use super::*;
 
     fn filters(from: &str, to: &str) -> Filters {

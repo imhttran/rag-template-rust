@@ -40,7 +40,8 @@ exits 0 even on failure, reporting the failure in the response.
   unreachable), `TIMEOUT`, or `INTERNAL`, mirrored in `diagnostics.error_code`.
 - Each `evidence` item carries `id`, `corpus`, `source` (the path stored by
   `ingest`, so set `RAG_SOURCE` to a repo-relative path), `document_hash`,
-  `section`, `page`, `text`, `retrieval_method` (`hybrid`), `score`, and `rank`.
+  `chunk_hash` (`sha256:<hex>` of the exact UTF-8 bytes of `text`, which SOP
+  recomputes and rejects on mismatch), `section`, `page`, `text`, `retrieval_method` (`hybrid`), `score`, and `rank`.
 
 It reads `DATABASE_URL`, `OLLAMA_URL`, `OLLAMA_EMBED_MODEL`, `EMBED_DIM`, and
 `EMBED_PROVIDER` with the same defaults as the other commands, and returns what
