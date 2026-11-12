@@ -174,6 +174,7 @@ fn retrieve(dsn: &str, ollama: &str, allowed: &str, request: Value) -> Value {
                 "corpus",
                 "source",
                 "document_hash",
+                "chunk_hash",
                 "section",
                 "page",
                 "text",
@@ -227,6 +228,13 @@ fn allowed_corpus_returns_ranked_cited_evidence_from_rust_ingest() {
         assert_eq!(item["retrieval_method"], "hybrid");
         assert_eq!(item["rank"], index + 1);
         assert!(!item["document_hash"].as_str().unwrap().is_empty());
+        // chunk_hash is sha256:<64 lowercase hex> over the exact text bytes.
+        let chunk_hash = item["chunk_hash"].as_str().unwrap();
+        assert_eq!(chunk_hash.len(), "sha256:".len() + 64, "{chunk_hash}");
+        assert!(chunk_hash.starts_with("sha256:"));
+        assert!(chunk_hash["sha256:".len()..]
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()));
         assert!(item["text"].as_str().unwrap().contains("keyword search"));
         assert!(item["score"].as_f64().unwrap() > 0.0);
     }
